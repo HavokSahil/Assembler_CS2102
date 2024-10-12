@@ -3,6 +3,10 @@ project(Assembler C)
 
 # Set the C standard
 set(CMAKE_C_STANDARD 11)
+# Enable debug mode
+
+set(CMAKE_BUILD_TYPE Debug)
+
 
 # Add compiler flags for strict C89 compliance
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -13,6 +17,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wall
         -Wpointer-arith
         -Wwrite-strings
+        -g
+        -O0
     )
 endif()
 
@@ -43,9 +49,14 @@ set(HASHMAP_TEST_SOURCES
     test/hashmap_tests.c
 )
 
+set(SYSTEMIZER_TEST_SOURCES
+    test/systemizer_tests.c
+)
+
 # Add test executable
 add_executable(AssemblerTests ${TEST_SOURCES})
 add_executable(HashMapTests ${HASHMAP_TEST_SOURCES})
+add_executable(SystemizerTests ${SYSTEMIZER_TEST_SOURCES})
 
 # Link the main project target to tests
 target_link_libraries(AssemblerTests PRIVATE
@@ -56,5 +67,10 @@ target_link_libraries(HashMapTests PRIVATE
     ass_utils
 )
 
+target_link_libraries(SystemizerTests PRIVATE
+    ass_utils
+)
+
 add_test(NAME AssemblerTests COMMAND AssemblerTests)
 add_test(NAME HashMapTests COMMAND HashMapTests)
+add_test(NAME SystemizerTests COMMAND SystemizerTests)
