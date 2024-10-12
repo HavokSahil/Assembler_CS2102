@@ -6,6 +6,8 @@ Course Project CS2102: Roll -> 2301CS41
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdio.h>
+
 /* Context Definitions */
 #define _ASS_CNTXT_COMM 0x00     /* Comment Context */
 #define _ASS_CNTXT_INST 0x01     /* Instruction Context */
@@ -199,17 +201,68 @@ int set_pseudo_instruction(unsigned char flags);
 #define _ASS_ERR_FL_BOF 0x51   /* Warning: Buffer overflow  */ 
 #define _ASS_ERR_FL_BUF 0x52   /* Warning: Black Line  */
 
-int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map);   /* Reads the asm file and store it in syntax tree  */ 
-int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, unsigned long line_no);    /* decode the asm code line into syntax tree node and insert it  */ 
+/* Message Structures */
+
+/* Defination of message serverity level  */
+#define _ASS_MSG_LVL_INF 0x61
+#define _ASS_MSG_LVL_ERR 0x62
+#define _ASS_MSG_LVL_WRN 0x63
+
+struct _ass_message {
+    unsigned char code;         /* codes like error codes or warning codes */ 
+    unsigned char severity;    /* severity like {ERROR, WARNING, INFO}  */ 
+    int line_no;                /* line number of context [default -1]  */
+    struct _ass_message *next;
+};
+
+struct _ass_message_list {
+    struct _ass_message *msgs;
+    unsigned long size;
+};
+
+struct _ass_machine_instruction {
+    char byte1;
+    char byte2;
+    char byte3;
+    char byte4;
+    struct _ass_machine_instruction *next;
+};
+
+struct _ass_instruction_list {
+    struct _ass_machine_instruction *intrs;
+};
+
+typedef struct _ass_message AMsg;
+typedef struct _ass_message_list AMsgList;
+typedef struct _ass_machine_instruction MacInstr;
+typedef struct _ass_instruction_list InstrList;
+
+
+int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, AMsgList *msglist);   /* Reads the asm file and store it in syntax tree  */ 
+int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, AMsgList *msglist, unsigned long line_no);    /* decode the asm code line into syntax tree node and insert it  */ 
 void judge_instructions(SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map); /* Makes final pass through all the nodes to find errors  */ 
 void judge_instructions_handler(SynTreeNode *node, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map);  /* Inner recursive function for judge_instructions()  */ 
 
+MacInstr *create_new_machine_instruction(unsigned char op_code, unsigned long operand);
+int insert_machine_instruction(InstrList *ilist, unsigned char op_code, unsigned long operand);
+int insert_machine_instruction_handler(MacInstr *minstr, unsigned char op_code, unsigned long operand);
+void print_machine_instruction(InstrList *ilist, FILE *stream);
+
+AMsg *create_new_message(unsigned char code, unsigned char severity, int line_no);
+AMsgList *create_new_amsg_list();
+int insert_message(AMsgList *mlist, unsigned char code, unsigned char severity, int line_no);
+int insert_message_handler(AMsg *msgs, unsigned char code, unsigned char severity, int line_no);
+void print_message_list(AMsgList *mlist, FILE *stream);
+
+int check_error(SynTree *tree, AMsgList *msglist);
+int check_error_handler(SynTreeNode *node, AMsgList *msglist);
+int generate_advanced_listing_file(const char *filename, SynTree *tree, SymTable *table, AMsgList *msglist);
+
 /* Dump Functions for Structures [Only for debugging purposes]  */
-void dump_instruction_node(const InstNode *node);
-void dump_syntax_tree_node(const SynTreeNode *node);
-void dump_syntax_tree(const SynTree *tree); 
-void dump_hash_table(const S2IHMap *map);
-void dump_hashmap_bucket(const HMapBkt *bucket);
-void dump_bucket_node(const BktNode *node);
+void dump_syntax_tree_node(const SynTreeNode *node, FILE *stream);
+void dump_syntax_tree(const SynTree *tree, FILE *stream); 
+void dump_hash_table(const S2IHMap *map, FILE *stream);
+void dump_hashmap_bucket(const HMapBkt *bucket, FILE *stream);
+void dump_bucket_node(const BktNode *node, FILE *stream);
 #endif
 

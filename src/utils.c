@@ -8,6 +8,7 @@ Course Project [CS2102]: Roll -> 2301CS41
 #include <utils.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 /* Returns the attributes of lines in masked 8-bit number */
 unsigned char get_line_attrib(char *line) {
@@ -28,7 +29,7 @@ unsigned char get_line_attrib(char *line) {
     if ((result & 1) == 0) {
         /* Check for full comment */ 
         char *ptr = line;
-        while (*ptr == ' ') ptr++;
+        while ((*ptr == ' ') || (*ptr == '\t')) ptr++;
         if (*ptr == ';')
             result |= (1<<_ASS_ATTR_LN_FLCOM);
     }
@@ -57,7 +58,9 @@ unsigned char get_line_attrib(char *line) {
             if (strstr(token, "data") != NULL) {
                 result |= (1<<_ASS_ATTR_LN_LBDAT);
             }
-
+            if (strstr(token, "SET") != NULL) {
+                result |= (1<<_ASS_ATTR_LN_LBSET);
+            }
             return result;  /* Return early without checking for operands */
         }
 
@@ -414,17 +417,15 @@ int hmap_insert_to_bucket(HMapBkt *bucket, char *key, unsigned long value) {
     if (cur == NULL)
         bucket->head = node;
     else {
-        while (cur->next != NULL) {  /* Move to the end of the linked list  */ 
+        while (cur != NULL) {  /* Move to the end of the linked list  */ 
             /* Report if key already exists  */
             if (strcmp(cur->key, key) == 0)
                 return _HMAP_ERR_KYEXST;
             cur = cur->next;
         }
 
-        if (strcmp(cur->key, key) == 0)
-            return _HMAP_ERR_KYEXST;
-
-        cur->next = node;
+        node->next = bucket->head;
+        bucket->head = node;
     }
     
     bucket->bucket_size+=1;
@@ -518,7 +519,7 @@ void free_s2i_hashmap(S2IHMap *map) {
     map = NULL;
 }
 
-int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map) {
+int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, AMsgList *msglist) {
     
     /* Check for file format [.asm] */
     char *cur = strstr(filename, ".asm");
@@ -545,10 +546,11 @@ int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem 
 
         unsigned char context = get_line_context(copy_line);     /* Get the context of the line  */ 
         if (full_comment(context) == 0)  {                  /* if line is not all comment  */ 
-            int exec_code = asm_st_constructor(line, tree, table, datmem, mnemonic_map, line_no);
-            if (exec_code != SUCCESS) {
-                fclose(file);
-                return exec_code;
+            int exec_code = asm_st_constructor(line, tree, table, datmem, mnemonic_map, msglist, line_no);
+            printf("The execution code is %d\n", exec_code);
+            if (exec_code == _HMAP_ERR_KYEXST) {   /* Label repeat error  */ 
+               insert_message(msglist, _ASS_ERR_DUP_LABEL, _ASS_MSG_LVL_ERR, line_no);
+               continue;
             }
         }       
         /* If line buffer gets fully filled  */
@@ -572,12 +574,12 @@ int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem 
 
 }
 
-int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, unsigned long line_no) {
+int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, AMsgList *msglist, unsigned long line_no) {
 
     static unsigned long address = 0;
 
     char copy_line[_ASS_ATTR_FL_BUFFSZ];   /* Copy of the line to preserve the original line while tokenizing  */ 
-    memcpy(copy_line, line, (unsigned long)strlen(line));
+    memcpy(copy_line, line, 1+(unsigned long)strlen(line));
     char *comment; /* Comment: if present assing a dynamic memory to it  */ 
 
     unsigned char flags = get_line_attrib(copy_line);
@@ -588,6 +590,19 @@ int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datme
         char delim[] = " ;:\t";
 
         label = strtok(line, delim);    /* This gives the label name  */ 
+        char *label_t = (char *)malloc(_ASS_ATTR_BF_HMAPKY);
+        if (label_t != NULL) {
+            unsigned long i;
+            for (i = 0; i<_ASS_ATTR_BF_HMAPKY; i++) {
+                label_t[i] = label[i];
+                if (label[i] == '\0')
+                    break;
+            }
+    
+            label_t[_ASS_ATTR_BF_HMAPKY - 1] = '\0';
+            label = label_t;
+        }
+
         strtok(NULL, delim);   /* Spits out `data` text  */ 
 
         char *data;
@@ -604,11 +619,45 @@ int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datme
 
         return hmap_insert(table, label, nval);
     }
+     if (set_pseudo_instruction(flags) == 1) {  /* There is label SET directive declaration in this line  */
+
+        char *label;
+        char delim[] = " ;:\t\n";
+
+        label = strtok(line, delim);    /* This gives the label name  */ 
+        char *label_t = (char *)malloc(_ASS_ATTR_BF_HMAPKY);
+        if (label_t != NULL) {
+            unsigned long i;
+            for (i = 0; i<_ASS_ATTR_BF_HMAPKY; i++) {
+                label_t[i] = label[i];
+                if (label[i] == '\0')
+                    break;
+            }
+    
+            label_t[_ASS_ATTR_BF_HMAPKY - 1] = '\0';
+            label = label_t;
+        }
+
+        strtok(NULL, delim);   /* Spits out `data` text  */ 
+        char *data;
+        data = strtok(NULL, delim); /* Gets the actual data value  */ 
+
+        char *data_end = data; /* Find the end pointer of data string as required by strtol function  */ 
+        while (isdigit(*data_end))
+            data_end++;
+        
+        unsigned long nval = strtol(data, data_end, 10);
+        if (data_end == data) {  /* No conversion is performed  */ 
+            return _ASS_ERR_INV_OPRND; 
+        }
+
+        return hmap_insert(table, label, nval);
+    }
 
     if (label_declaration(flags) == 1) {   /* There is a label declaration in this line  */ 
 
         char *token;
-        char delim[] = " ;:\t";
+        char delim[] = " ;:\t\n";
         token = strtok(line, delim);
 
         if (token == NULL)
@@ -693,7 +742,7 @@ int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datme
 
     int code = insert_synTree_node(tree, node);
     if (code == SUCCESS)
-        address+=1;
+        address+=4;
 
     return code;
 }
@@ -763,8 +812,22 @@ void judge_instructions_handler(SynTreeNode *node, SymTable *table, DatMem *datm
     if (node->n_operand == 1) {
         char *operand = (node->instruction)->init_operand;
 
-        if ((*operand <= '9') && (*operand >= '0')) {
-            /* Operand is a value, parse it  */ 
+        if (isdigit(*operand)) {
+            /* Operand is a value, parse it  */
+            char *end_ptr = operand;
+
+            while (isdigit(*end_ptr)) {
+                end_ptr++;
+            }
+            unsigned long value = strtol(operand, end_ptr, 10);
+
+            if (operand == end_ptr) {     /* no conversion has been done  */ 
+                node->valid = 0;  
+                return;     
+            }
+
+            (node->instruction)->operand = value;
+
         } else {
             /* Operand is a symbol, fetch it */
             BktNode *symbol = hmap_get_item_by_key(table, operand);
@@ -791,97 +854,199 @@ void judge_instructions_handler(SynTreeNode *node, SymTable *table, DatMem *datm
     }
 }
 
-/* Dump functions for structures [only for debugging purposes] */
+/* Functions for assembler messages */
+AMsg *create_new_message(unsigned char code, unsigned char severity, int line_no) {
+    AMsg *msg = (AMsg *)malloc(sizeof(AMsg));
 
-/* Dump function for InstNode */
-void dump_instruction_node(const InstNode *node) {
-    if (node == NULL) {
-        printf("Instruction Node: NULL\n");
-        return;
-    }
-    printf("Instruction Node:\n");
-    printf("  Mnemonic: %s\n", node->mnemonic ? node->mnemonic : "NULL");
-    printf("  OP Code: %u\n", node->op_code);
-    printf("  Initial Operand: %s\n", node->init_operand ? node->init_operand : "NULL");
-    printf("  Operand: %d\n", node->operand);
+    if (msg == NULL)
+        return NULL;
+
+    msg->code = code;
+    msg->severity = severity;
+    msg->line_no = line_no;
+    msg->next = NULL;
+
+    return msg;
 }
 
+AMsgList *create_new_amsg_list() {
+    AMsgList *msglist = (AMsgList *)malloc(sizeof(AMsgList));
+    
+    if (msglist == NULL)
+        return NULL;
+
+    msglist->msgs = NULL;
+    msglist->size = 0;
+
+    return msglist;
+}
+
+int insert_message(AMsgList *msglist, unsigned char code, unsigned char severity, int line_no) {
+    if (msglist->msgs == NULL) {
+        AMsg *msg = create_new_message(code, severity, line_no);
+        if (msg == NULL)
+            return FAILURE;
+        msglist->msgs = msg;
+        
+        return SUCCESS;
+    }
+
+    return insert_message_handler(msglist->msgs, code, severity, line_no);
+}
+
+int insert_message_handler(AMsg *msgs, unsigned char code, unsigned char severity, int line_no) {
+    AMsg *msg = create_new_message(code, severity, line_no);
+    if (msg == NULL)
+        return FAILURE;
+    msg->next = msgs;
+    msgs = msg;
+}
+
+void print_message_list(AMsgList *mlist, FILE *stream) {
+    if (mlist == NULL)          return;
+    if (mlist->msgs == NULL)    return;
+    
+    fprintf(stream, "\nWarnings and Errors:\n");
+    fprintf(stream, "%-*s %-*s %-*s %-*s\n", 6, "Line", 10, "Severity", 6,"Code", 32, "Description");
+    fprintf(stream, "----------------------------------------\n");
+
+    AMsg *cur = mlist->msgs;
+    while (cur) {
+
+        fprintf(stream, "%-*ld ", 6, cur->line_no);
+
+        if (cur->severity == _ASS_MSG_LVL_INF)
+            fprintf(stream, "%-*s ", 10,"INFO");
+        else if (cur->severity == _ASS_MSG_LVL_ERR)
+            fprintf(stream, "%-*s ", 10, "ERROR");
+        else
+            fprintf(stream, "%-*s", 10, "WARNING");
+
+        fprintf(stream, "%06X " ,cur->code);
+
+        switch (cur->code) {
+            case _ASS_ERR_INV_OPCOD:
+                fprintf(stream, "%-*s\n", 32, "Invalid Op-Code.");
+                break;
+            case _ASS_ERR_UDC_LABEL:
+                fprintf(stream, "%-*s\n", 32, "Undeclared Label.");
+                break;
+            case _ASS_ERR_MIS_OPRND:
+                fprintf(stream, "%-*s\n", 32, "Missing Operand.");
+                break;
+            case _ASS_ERR_EXT_OPRND:
+                fprintf(stream, "%-*s\n", 32, "Extra Operand.");
+                break;
+            case _ASS_ERR_DUP_LABEL:
+                fprintf(stream, "%-*s\n", 32, "Duplicate Label.");
+                break;
+            case _ASS_ERR_INV_OPRND:
+                fprintf(stream, "%-*s\n", 32, "Invalid Operand.");
+                break;
+            case _ASS_ERR_MIS_INSTR:
+                fprintf(stream, "%-*s\n", 32, "Missing Instruction.");
+                break;
+            default:
+                break;
+        }
+
+        cur = cur->next;
+    }
+}
+
+int generate_advanced_listing_file(const char *filename, SynTree *tree, SymTable *table, AMsgList *msglist) {
+    FILE *output = fopen(filename, "w");
+
+    if (output == NULL)
+        return FAILURE;
+
+    dump_syntax_tree(tree, output);
+    dump_hash_table(table, output);
+    print_message_list(msglist, output);
+
+    fclose(output);
+    return SUCCESS;
+}
+
+int check_error(SynTree *tree, AMsgList *msglist) {
+    if (tree == NULL)
+        return SUCCESS;
+
+    return check_error_handler(tree->root, msglist);
+}
+
+int check_error_handler(SynTreeNode *node, AMsgList *msglist) {
+    if (node == NULL)
+        return SUCCESS;
+    
+    int res = check_error_handler(node->left, msglist);
+
+    if (node->valid == 0) { /* There is some error in this node  */ 
+        insert_message(msglist, node->broadcast_code, _ASS_MSG_LVL_ERR, node->line);
+        res = FAILURE;
+    }
+    
+    res |= check_error_handler(node->right, msglist);
+
+    return res;
+}
+
+/* Dump functions for structures [only for debugging purposes] */
+
 /* Dump function for SynTreeNode */
-void dump_syntax_tree_node(const SynTreeNode *node) {
+void dump_syntax_tree_node(const SynTreeNode *node, FILE *stream) {
     if (node == NULL) {
-        printf("Syntax Tree Node: NULL\n");
         return;
     }
-    printf("Syntax Tree Node:\n");
-    printf("  Address: %lu\n", node->address);
-    printf("  Line: %lu\n", node->line);
-    printf("  Number of Operands: %u\n", node->n_operand);
-    printf("  Valid: %s\n", node->valid ? "true" : "false");
-    printf("  Broadcast Code: %u\n", node->broadcast_code);
-    printf("  Comment: %s\n", (node->comment != NULL) ? node->comment : "NULL");
 
-    if (node->instruction != NULL) {
-        dump_instruction_node(node->instruction);
-    }
-
-    printf("  Left Child:\n");
-    dump_syntax_tree_node(node->left);
-    printf("  Right Child:\n");
-    dump_syntax_tree_node(node->right);
+    dump_syntax_tree_node(node->left, stream);
+    fprintf(stream, "%-*ld %08X %-*s %-*s %-*s %-*s\n", 8, node->line, (unsigned int)node->address, 20, " Machine Code", 6, (node->instruction)->mnemonic, 10, ((node->instruction)->init_operand == NULL)? " ": (node->instruction)->init_operand, 64, node->comment);
+    dump_syntax_tree_node(node->right, stream);
 }
 
 /* Dump function for SynTree */
-void dump_syntax_tree(const SynTree *tree) {
+void dump_syntax_tree(const SynTree *tree, FILE *stream) {
     if (tree == NULL) {
-        printf("Syntax Tree: NULL\n");
         return;
     }
-    printf("Syntax Tree:\n");
-    printf("  Number of Nodes: %lu\n", tree->n_nodes);
-    printf("  Root Node:\n");
-    dump_syntax_tree_node(tree->root);
+    fprintf(stream, "Advanced Listing Table: \n");
+    fprintf(stream, "%-*s %-*s %-*s %-*s %-*s %-*s\n", 8, "Line", 8, "Memory", 20, "Machine Code", 6, "Assembly",10, "Code", 64, "Comments");
+    fprintf(stream, "-----------------------------------------------------------------------\n");
+    dump_syntax_tree_node(tree->root, stream);
 }
 
 /* Dump function for hash table  */
-void dump_hash_table(const S2IHMap *map) {
+void dump_hash_table(const S2IHMap *map, FILE *stream) {
     if (map == NULL) {
-        printf("Hash Map: NULL \n");
         return;
     }
-
-    printf("\nHash Map: \n");
-    printf("Root: ");
-    dump_hashmap_bucket(map->root);
+    
+    fprintf(stream, "Symbol Table:\n");
+    fprintf(stream, "%-*s %-*s\n", 20, "Symbols", 16, "Address");
+    fprintf(stream, "------------------------------------\n");
+    dump_hashmap_bucket(map->root, stream);
 }
 
 /* Dump Hash map bucket  */
-void dump_hashmap_bucket(const HMapBkt *bucket) {
+void dump_hashmap_bucket(const HMapBkt *bucket, FILE *stream) {
     if (bucket == NULL) {
-        printf("Bucket: NULL\n");
         return;
     }
 
-    printf("Left: \n");
-    dump_hashmap_bucket(bucket->left);
-
-    printf("Right: \n");
-    dump_hashmap_bucket(bucket->right);
-
-    printf("Bucket: %lu\n", bucket->hash_value);
+    dump_hashmap_bucket(bucket->left, stream);
     BktNode *node = bucket->head;
     while (node) {
-        dump_bucket_node(node);
+        dump_bucket_node(node, stream);
         node = node->next;
     }
+    dump_hashmap_bucket(bucket->right, stream);
 }
 
 /* Dump hash map bucket node  */
-void dump_bucket_node(const BktNode *node) {
+void dump_bucket_node(const BktNode *node, FILE *stream) {
     if (node == NULL) {
-        printf("BktNode: NULL\n");
         return;
     }
-
-    printf("key: %s, value: %lu\n", node->key, node->value);
+    fprintf(stream, "%-*s %08X\n", 20, node->key, (unsigned int)node->value);
 }
 
