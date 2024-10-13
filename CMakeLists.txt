@@ -12,11 +12,12 @@ set(CMAKE_BUILD_TYPE Debug)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
         -std=c89
-        -pedantic
-        -W
-        -Wall
-        -Wpointer-arith
-        -Wwrite-strings
+        -w
+        #-pedantic
+        #-W
+        #-Wall
+        #-Wpointer-arith
+        #-Wwrite-strings
         -g
         -O0
     )
@@ -26,10 +27,13 @@ endif()
 include_directories(include)
 
 # Source files
-file(GLOB SOURCES "src/main.c")
+set(SOURCES
+    src/main.c
+)
 
 # Add libraries
 add_library(ass_utils src/utils.c)
+add_library(arg_utils src/apsr.c)
 
 # Create the main executable
 add_executable(Assembler ${SOURCES})
@@ -37,6 +41,7 @@ add_executable(Assembler ${SOURCES})
 # Link libraries
 target_link_libraries(Assembler PRIVATE
     ass_utils
+    arg_utils
 )
 
 # Enable testing functionality

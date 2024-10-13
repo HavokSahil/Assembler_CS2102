@@ -7,6 +7,7 @@ Course Project CS2102: Roll -> 2301CS41
 #define UTILS_H
 
 #include <stdio.h>
+#include <stdint.h>
 
 /* Context Definitions */
 #define _ASS_CNTXT_COMM 0x00     /* Comment Context */
@@ -109,7 +110,7 @@ struct _ass_instruction_node {
     char *mnemonic;             /* Initial Mnemonic of the instruction without translation */ 
     unsigned char op_code;      /* OP Code of the instruction */
     char *init_operand;         /* Initial Operand before label address is substituted */
-    unsigned char operand;     /* Operand value after the label address is substituted */
+    long int operand;           /* Operand value after the label address is substituted */
 };
 
 /* Data structure for individual node of syntax tree [outer node of syntax tree] */
@@ -221,10 +222,7 @@ struct _ass_message_list {
 };
 
 struct _ass_machine_instruction {
-    char byte1;
-    char byte2;
-    char byte3;
-    char byte4;
+    uint32_t instruction_word;
     struct _ass_machine_instruction *next;
 };
 
@@ -243,19 +241,19 @@ int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datme
 void judge_instructions(SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map); /* Makes final pass through all the nodes to find errors  */ 
 void judge_instructions_handler(SynTreeNode *node, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map);  /* Inner recursive function for judge_instructions()  */ 
 
-MacInstr *create_new_machine_instruction(unsigned char op_code, unsigned long operand);
-int insert_machine_instruction(InstrList *ilist, unsigned char op_code, unsigned long operand);
-int insert_machine_instruction_handler(MacInstr *minstr, unsigned char op_code, unsigned long operand);
+uint32_t get_machine_instruction(int32_t operand, uint8_t opcode, unsigned char n_operand);
+MacInstr *create_new_machine_instruction(unsigned char op_code, long int operand, unsigned char n_operand);
+InstrList *create_new_instruction_list();
+int insert_machine_instruction(InstrList *ilist, unsigned char op_code, long int operand, unsigned char n_operand);
 void print_machine_instruction(InstrList *ilist, FILE *stream);
 
 AMsg *create_new_message(unsigned char code, unsigned char severity, int line_no);
 AMsgList *create_new_amsg_list();
 int insert_message(AMsgList *mlist, unsigned char code, unsigned char severity, int line_no);
-int insert_message_handler(AMsg *msgs, unsigned char code, unsigned char severity, int line_no);
 void print_message_list(AMsgList *mlist, FILE *stream);
 
-int check_error(SynTree *tree, AMsgList *msglist);
-int check_error_handler(SynTreeNode *node, AMsgList *msglist);
+int check_error(SynTree *tree, AMsgList *msglist, InstrList *ilist);
+int check_error_handler(SynTreeNode *node, AMsgList *msglist, InstrList *ilist);
 int generate_advanced_listing_file(const char *filename, SynTree *tree, SymTable *table, AMsgList *msglist);
 
 /* Dump Functions for Structures [Only for debugging purposes]  */

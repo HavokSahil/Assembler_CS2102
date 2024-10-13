@@ -547,7 +547,6 @@ int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem 
         unsigned char context = get_line_context(copy_line);     /* Get the context of the line  */ 
         if (full_comment(context) == 0)  {                  /* if line is not all comment  */ 
             int exec_code = asm_st_constructor(line, tree, table, datmem, mnemonic_map, msglist, line_no);
-            printf("The execution code is %d\n", exec_code);
             if (exec_code == _HMAP_ERR_KYEXST) {   /* Label repeat error  */ 
                insert_message(msglist, _ASS_ERR_DUP_LABEL, _ASS_MSG_LVL_ERR, line_no);
                continue;
@@ -572,6 +571,7 @@ int asm_systemizer(const char *filename, SynTree *tree, SymTable *table, DatMem 
 
     fclose(file);
 
+    return SUCCESS;
 }
 
 int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datmem, S2IHMap *mnemonic_map, AMsgList *msglist, unsigned long line_no) {
@@ -683,19 +683,22 @@ int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datme
         char *cur = line;
         while (*cur != ';')
             cur++;
-
-        char *comment_t = (char *)malloc(_ASS_ATTR_BF_COMLIM);
+        cur++;
+        unsigned long sz = (_ASS_ATTR_BF_COMLIM > (strlen(cur) + 1))? strlen(cur) + 1: _ASS_ATTR_BF_COMLIM;
+        char *comment_t = (char *)malloc(sz);
         if (comment_t != NULL) {
             unsigned long i;
-            for (i = 0; i<_ASS_ATTR_BF_COMLIM; i++) {
-                if (cur[i] == '\0')
-                    break;
-                comment_t[i] = cur[i];
+            for (i = 0; i<sz; i++)
+                if (cur[i] == '\n')
+                    comment_t[i] = '\\';
+                else
+                    comment_t[i] = cur[i];
             }
 
-            comment_t[_ASS_ATTR_BF_COMLIM - 1] = '\0';
+            comment_t[sz - 1] = '\0';
             comment = comment_t;
-        }
+    } else {
+            comment = NULL;
     }
 
     /* There is instruction in the line  */
@@ -712,14 +715,13 @@ int asm_st_constructor(char *line, SynTree *tree, SymTable *table, DatMem *datme
     if (one_operand(flags) == 1) { /* There is one operand instruction in the line  */ 
 
         operand = strtok(NULL, delim);
-        char *operand_t  = (char *)malloc(_ASS_ATTR_BF_OPERND);
-
-        for (i = 0; i<_ASS_ATTR_BF_OPERND; i++) {
+        unsigned long sz = (strlen(operand) + 1 < _ASS_ATTR_BF_OPERND)? strlen(operand) + 1: _ASS_ATTR_BF_OPERND;
+        char *operand_t  = (char *)malloc(sz);
+        for (i = 0; i<sz; i++) {
             operand_t[i] = operand[i];
-            if (operand[i] == '\0')
-                break;
         }
-        operand_t[_ASS_ATTR_BF_OPERND - 1] = '\0';
+
+        operand_t[sz-1] = '\0';
         operand = operand_t;
 
     } else {
@@ -812,22 +814,26 @@ void judge_instructions_handler(SynTreeNode *node, SymTable *table, DatMem *datm
     if (node->n_operand == 1) {
         char *operand = (node->instruction)->init_operand;
 
-        if (isdigit(*operand)) {
+        if (isdigit(*operand) || (*operand == '-')) {
             /* Operand is a value, parse it  */
             char *end_ptr = operand;
-
+            while (!isdigit(*end_ptr)) {
+                end_ptr++;
+            }
             while (isdigit(*end_ptr)) {
                 end_ptr++;
             }
-            unsigned long value = strtol(operand, end_ptr, 10);
+
+            char *null_term = end_ptr; /* Store the position of null terminator of the init_operand  */ 
+            long int value = strtol(operand, end_ptr, 10);
 
             if (operand == end_ptr) {     /* no conversion has been done  */ 
                 node->valid = 0;  
                 return;     
             }
 
+            *null_term = '\0'; /* Recover the null terminator of the init_operand  */ 
             (node->instruction)->operand = value;
-
         } else {
             /* Operand is a symbol, fetch it */
             BktNode *symbol = hmap_get_item_by_key(table, operand);
@@ -882,24 +888,17 @@ AMsgList *create_new_amsg_list() {
 }
 
 int insert_message(AMsgList *msglist, unsigned char code, unsigned char severity, int line_no) {
-    if (msglist->msgs == NULL) {
-        AMsg *msg = create_new_message(code, severity, line_no);
-        if (msg == NULL)
-            return FAILURE;
-        msglist->msgs = msg;
-        
-        return SUCCESS;
-    }
-
-    return insert_message_handler(msglist->msgs, code, severity, line_no);
-}
-
-int insert_message_handler(AMsg *msgs, unsigned char code, unsigned char severity, int line_no) {
     AMsg *msg = create_new_message(code, severity, line_no);
     if (msg == NULL)
         return FAILURE;
-    msg->next = msgs;
-    msgs = msg;
+
+    if (msglist->msgs == NULL) {
+        msglist->msgs = msg;
+        return SUCCESS;
+    }
+    msg->next = msglist->msgs;
+    msglist->msgs = msg;
+    return SUCCESS;
 }
 
 void print_message_list(AMsgList *mlist, FILE *stream) {
@@ -913,7 +912,7 @@ void print_message_list(AMsgList *mlist, FILE *stream) {
     AMsg *cur = mlist->msgs;
     while (cur) {
 
-        fprintf(stream, "%-*ld ", 6, cur->line_no);
+        fprintf(stream, "%-*ld ", 6, (unsigned long)cur->line_no);
 
         if (cur->severity == _ASS_MSG_LVL_INF)
             fprintf(stream, "%-*s ", 10,"INFO");
@@ -922,29 +921,29 @@ void print_message_list(AMsgList *mlist, FILE *stream) {
         else
             fprintf(stream, "%-*s", 10, "WARNING");
 
-        fprintf(stream, "%06X " ,cur->code);
+        fprintf(stream, "%04X" ,cur->code);
 
         switch (cur->code) {
             case _ASS_ERR_INV_OPCOD:
-                fprintf(stream, "%-*s\n", 32, "Invalid Op-Code.");
+                fprintf(stream, "\t %-*s\n", 32, "Invalid Op-Code.");
                 break;
             case _ASS_ERR_UDC_LABEL:
-                fprintf(stream, "%-*s\n", 32, "Undeclared Label.");
+                fprintf(stream, "\t %-*s\n", 32, "Undeclared Label.");
                 break;
             case _ASS_ERR_MIS_OPRND:
-                fprintf(stream, "%-*s\n", 32, "Missing Operand.");
+                fprintf(stream, "\t %-*s\n", 32, "Missing Operand.");
                 break;
             case _ASS_ERR_EXT_OPRND:
-                fprintf(stream, "%-*s\n", 32, "Extra Operand.");
+                fprintf(stream, "\t %-*s\n", 32, "Extra Operand.");
                 break;
             case _ASS_ERR_DUP_LABEL:
-                fprintf(stream, "%-*s\n", 32, "Duplicate Label.");
+                fprintf(stream, "\t %-*s\n", 32, "Duplicate Label.");
                 break;
             case _ASS_ERR_INV_OPRND:
-                fprintf(stream, "%-*s\n", 32, "Invalid Operand.");
+                fprintf(stream, "\t %-*s\n", 32, "Invalid Operand.");
                 break;
             case _ASS_ERR_MIS_INSTR:
-                fprintf(stream, "%-*s\n", 32, "Missing Instruction.");
+                fprintf(stream, "\t %-*s\n", 32, "Missing Instruction.");
                 break;
             default:
                 break;
@@ -968,27 +967,103 @@ int generate_advanced_listing_file(const char *filename, SynTree *tree, SymTable
     return SUCCESS;
 }
 
-int check_error(SynTree *tree, AMsgList *msglist) {
+/* Check for errors and populate instructions  */
+int check_error(SynTree *tree, AMsgList *msglist, InstrList *ilist) {
     if (tree == NULL)
         return SUCCESS;
 
-    return check_error_handler(tree->root, msglist);
+    return check_error_handler(tree->root, msglist, ilist);
 }
 
-int check_error_handler(SynTreeNode *node, AMsgList *msglist) {
+int check_error_handler(SynTreeNode *node, AMsgList *msglist, InstrList *ilist) {
     if (node == NULL)
         return SUCCESS;
     
-    int res = check_error_handler(node->left, msglist);
+    int res = check_error_handler(node->right, msglist, ilist);
 
     if (node->valid == 0) { /* There is some error in this node  */ 
         insert_message(msglist, node->broadcast_code, _ASS_MSG_LVL_ERR, node->line);
         res = FAILURE;
+    } else {
+        insert_machine_instruction(ilist, (node->instruction)->op_code, (node->instruction)->operand, node->n_operand);
     }
     
-    res |= check_error_handler(node->right, msglist);
+    res |= check_error_handler(node->left, msglist, ilist);
 
     return res;
+}
+
+/* The function that returns final instruction from op-code and operand  */
+uint32_t get_machine_instruction(int32_t operand, uint8_t opcode, unsigned char n_operand) {
+    if (n_operand == 0) {
+        return (0xFF)&opcode;
+    }
+
+    if (operand<-8388608) operand = -8388608;
+    if (operand>8388607) operand = 8388607;
+
+    return ((0xFFFFFF & operand)<<8) | (0xFF & opcode);
+}
+
+/* Functions for handling machine instructions and dumping it  */
+MacInstr *create_new_machine_instruction(unsigned char op_code, long int operand, unsigned char n_operand) {
+    MacInstr *macinstr = (MacInstr *)malloc(sizeof(macinstr));
+    
+    if (macinstr == NULL)
+        return NULL;
+
+    macinstr->instruction_word = get_machine_instruction(operand, op_code, n_operand);
+    macinstr->next = NULL;
+
+    return macinstr;
+}
+
+/* Insert machine instruction MacInstr structure in instruction list structure linked list  */
+int insert_machine_instruction(InstrList *ilist, unsigned char op_code, long int operand, unsigned char n_operand) {
+    if (ilist == NULL)
+        return FAILURE;
+    
+    MacInstr *macinstr = create_new_machine_instruction(op_code, operand, n_operand);
+
+    if (macinstr == NULL)
+        return FAILURE;
+
+    if (ilist->intrs == NULL) {
+        ilist->intrs = macinstr;
+        return SUCCESS;
+    }
+
+    macinstr->next = ilist->intrs;
+    ilist->intrs = macinstr;
+
+    return SUCCESS;
+}
+
+/* Allocate memory to new instruction  */
+InstrList *create_new_instruction_list() {
+    InstrList *ilist = (InstrList *)malloc(sizeof(InstrList));
+    return ilist;
+}
+
+/* Output the instruction into stream  */
+void print_machine_instruction(InstrList *ilist, FILE *stream) {
+    if (ilist == NULL)
+        return;
+
+    MacInstr *macinstr = ilist->intrs;
+    while (macinstr) {
+        uint32_t instruction_word = macinstr->instruction_word;
+
+        unsigned char bytes[4] = {
+            (instruction_word>>24)  &0xFF,
+            (instruction_word>>16)  &0xFF,
+            (instruction_word>>8)   &0xFF,
+            (instruction_word)     &0xFF,
+        };
+
+        fwrite(bytes, sizeof(bytes), 1, stream);
+        macinstr = macinstr->next;
+    }
 }
 
 /* Dump functions for structures [only for debugging purposes] */
@@ -1000,7 +1075,9 @@ void dump_syntax_tree_node(const SynTreeNode *node, FILE *stream) {
     }
 
     dump_syntax_tree_node(node->left, stream);
-    fprintf(stream, "%-*ld %08X %-*s %-*s %-*s %-*s\n", 8, node->line, (unsigned int)node->address, 20, " Machine Code", 6, (node->instruction)->mnemonic, 10, ((node->instruction)->init_operand == NULL)? " ": (node->instruction)->init_operand, 64, node->comment);
+
+    char *comment = (node->comment == NULL)? " ": node->comment;
+    fprintf(stream, "%-*ld %08X \t  %08X \t\t\t\t %-*s %-*s %-*s\n", 8, node->line, (unsigned int)node->address, get_machine_instruction((node->instruction)->operand, (node->instruction)->op_code, node->n_operand), 6, (node->instruction)->mnemonic, 10, ((node->instruction)->init_operand == NULL)? " ": (node->instruction)->init_operand, 64, comment);
     dump_syntax_tree_node(node->right, stream);
 }
 
@@ -1010,7 +1087,8 @@ void dump_syntax_tree(const SynTree *tree, FILE *stream) {
         return;
     }
     fprintf(stream, "Advanced Listing Table: \n");
-    fprintf(stream, "%-*s %-*s %-*s %-*s %-*s %-*s\n", 8, "Line", 8, "Memory", 20, "Machine Code", 6, "Assembly",10, "Code", 64, "Comments");
+    fprintf(stream, "\nInstruction Table: \n");
+    fprintf(stream, "%-*s %-*s %-*s %-*s %-*s %-*s\n", 10, "Line", 10, "Memory", 16, "Machine Code", 6, "Assembly",10, "Code", 64, "Comments");
     fprintf(stream, "-----------------------------------------------------------------------\n");
     dump_syntax_tree_node(tree->root, stream);
 }
@@ -1021,7 +1099,7 @@ void dump_hash_table(const S2IHMap *map, FILE *stream) {
         return;
     }
     
-    fprintf(stream, "Symbol Table:\n");
+    fprintf(stream, "\nSymbol Table:\n");
     fprintf(stream, "%-*s %-*s\n", 20, "Symbols", 16, "Address");
     fprintf(stream, "------------------------------------\n");
     dump_hashmap_bucket(map->root, stream);

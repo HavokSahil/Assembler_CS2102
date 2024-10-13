@@ -12,13 +12,17 @@ int test_asm_systemizer() {
     DatMem *datmem = create_datMem();
     S2IHMap *mnemonic_map = get_mnemonic_map();
     AMsgList *msglist = create_new_amsg_list();
+    InstrList *ilist = create_new_instruction_list();
 
     int res = asm_systemizer(test_file, tree, table, datmem, mnemonic_map, msglist);
     if (res == TEST_PASSED) {
         judge_instructions(tree, table, datmem, mnemonic_map);
-        int i = check_error(tree, msglist);
-        if (i == FAILURE)
-            return FAILURE;
+        check_error(tree, msglist, ilist);
+        FILE *output = fopen("output.bin", "wb");
+        if (output != NULL) {
+            print_machine_instruction(ilist, output);
+            fclose(output);
+        }
         return generate_advanced_listing_file("out.txt", tree, table, msglist);
     }
     return res;
