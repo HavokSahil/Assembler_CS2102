@@ -3,8 +3,8 @@ project(Assembler C)
 
 # Set the C standard
 set(CMAKE_C_STANDARD 11)
-# Enable debug mode
 
+# Enable debug mode
 set(CMAKE_BUILD_TYPE Debug)
 
 
