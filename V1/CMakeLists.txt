@@ -13,6 +13,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
         -std=c89
         -w
+        -pg
         #-pedantic
         #-W
         -Wall
@@ -25,7 +26,7 @@ endif()
 
 # Set source directories
 set(SRC_DIR ${PROJECT_SOURCE_DIR}/src)
-set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include ${SRC_DIR}/parser ${SRC_DIR}/tokenizer ${SRC_DIR}/logger ${SRC_DIR}/decoder)
 set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
 
 # Include directories for header files
@@ -54,11 +55,13 @@ add_executable(test_logger ${TEST_DIR}/test_logger.c ${SRC_DIR}/logger/logger.c 
 add_executable(test_parser ${TEST_DIR}/test_parser.c ${SRC_DIR}/parser/parser.c ${SRC_DIR}/tokenizer/tokenizer.c ${SRC_DIR}/common_ds.c)
 add_executable(test_overlord ${TEST_DIR}/test_overlord.c ${SRC_DIR}/overlord.c ${SRC_DIR}/decoder/decoder.c ${SRC_DIR}/parser/parser.c ${SRC_DIR}/logger/logger.c ${SRC_DIR}/common_ds.c)
 add_executable(test_ds ${TEST_DIR}/test_ds.c ${SRC_DIR}/common_ds.c)
+add_executable(test_tokenizer ${TEST_DIR}/test_tokenizer.c ${SRC_DIR}/tokenizer/tokenizer.c)
 
 # Add tests
 add_test(NAME DecoderTest COMMAND test_decoder)
 add_test(NAME LoggerTest COMMAND test_logger)
 add_test(NAME ParserTest COMMAND test_parser)
+add_test(NAME TokenizerTest COMMAND test_tokenizer)
 add_test(NAME OverlordTest COMMAND test_overlord)
 add_test(NAME DataStructureTest COMMAND test_ds)
 

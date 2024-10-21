@@ -13,6 +13,7 @@ typedef unsigned char ABool;
 typedef unsigned char AByte;
 typedef signed long AInt;
 typedef signed long AErr;
+typedef unsigned char AType;
 typedef char* AString;
 typedef uint32_t AInt32;
 

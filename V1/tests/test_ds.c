@@ -29,7 +29,6 @@ int test_SymTable() {
     for (i = 0; i<4; i++) {
         if (item == table->end())
             return FAILURE;
-        printf("%s->%d\n", item->key, item->address);
         item = table->get(NULL);
     }
     table->destroy(table);
@@ -47,8 +46,6 @@ int test_DList() {
     int i;
     for (i = 0; i<4; i++) {
         if (dlist->insert(dlist, addrs[i], datas[i]) != SUCCESS) {
-            dlist->destroy(dlist);
-            printf("DEBUG 2");
             return FAILURE;
         }
         if (dlist->size(dlist) != (i+1))
@@ -68,7 +65,6 @@ int test_DList() {
         if (item == NULL)
             return FAILURE;
 
-        printf("The item is %d->%d\n", item->address, item->data);
         item = dlist->get(NULL);
     }
 
@@ -93,11 +89,36 @@ int test_IList() {
     for (i = 0; i<4; i++) {
         if (item == ilist->end())
             return FAILURE;
-        printf("The item is %d\n", item->address);
         item = ilist->get(NULL);
-    }
+    }   
+    ilist->get(NULL);
 
     ilist->destroy(ilist);
+    return SUCCESS;
+}
+
+int test_EWList() {
+    EWList* elist = ds_new_EWList();
+    if (elist == NULL)
+        return FAILURE;
+
+    int i;
+    for (i = 0; i<4; i++) {
+        EWItem* eitem = ds_new_EWItem(i, 0, FAILURE);
+        if (eitem == NULL)
+            return FAILURE;
+        if (elist->insert(elist, eitem) != SUCCESS)
+            return FAILURE;
+    }
+    EWItem* eitem = elist->get(elist);
+    for (i = 0; i<4; i++) {
+        if (eitem == elist->end())
+            return FAILURE;
+        eitem = elist->get(NULL);
+    }
+    elist->get(NULL);
+
+    elist->destroy(elist);
     return SUCCESS;
 }
 
@@ -107,6 +128,8 @@ int main() {
     if (test_DList() != SUCCESS)
         return FAILURE;
     if (test_IList() != SUCCESS)
+        return FAILURE;
+    if (test_EWList() != SUCCESS)
         return FAILURE;
     return SUCCESS;
 }
