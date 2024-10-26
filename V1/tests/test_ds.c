@@ -44,8 +44,9 @@ int test_DList() {
     AInt32 datas[] = {100, 200, 300, 400};
 
     int i;
+    int result_address;
     for (i = 0; i<4; i++) {
-        if (dlist->insert(dlist, addrs[i], datas[i]) != SUCCESS) {
+        if (dlist->insert(dlist, datas[i], &result_address) != SUCCESS) {
             return FAILURE;
         }
         if (dlist->size(dlist) != (i+1))
@@ -122,6 +123,70 @@ int test_EWList() {
     return SUCCESS;
 }
 
+int test_MnMap() {
+    MnMap* map = ds_new_MnMap();
+    if (map == NULL)
+        return FAILURE;
+
+    AString mnemo[] = {"add", "sub", "mu4l", "lcm3"};
+    ASize operator[] = {2, 2, 4, 3};
+    AAddr address[] = {0, 1, 2, 3};
+
+    int i;
+    for (i = 0; i<4; i++) {
+        if (map->insert(map, mnemo[i], address[i], operator[i]) != SUCCESS)
+            return FAILURE;
+    }
+    for (i = 0; i<4; i++) {
+        MnItem* mitem = map->find(map, mnemo[i]);
+        if (mitem == NULL)
+            return FAILURE;
+        if (mitem->n_operand != operator[i])
+            return FAILURE;
+    }
+
+    MnItem* mitem = map->get(map);
+    for (i = 0; i<4; i++) {
+        if (mitem == map->end())
+            return FAILURE;
+        mitem = map->get(NULL);
+    }
+    return SUCCESS;
+}
+
+int test_RegMap() { 
+    RegMap *map = ds_new_RegMap();
+    if (map == NULL)
+        return FAILURE;
+    
+    AString keys[] = {"$s0", "$s2", "$s4", "$s5"};
+    AAddr values[] = {1, 2, 3, 4};
+
+    int i;
+    for (i = 0; i<4; i++) {
+        if (map->insert(map, keys[i], values[i]) != SUCCESS) {
+            map->destroy(map);
+            return FAILURE;
+        }
+        if (map->size(map) != (i+1))
+            return FAILURE;
+    }
+
+    for (i = 0; i<4; i++) {
+        if (map->find(map, keys[i]) != values[i])
+            return FAILURE;
+    }
+    
+    RegItem* item = map->get(map);
+
+    for (i = 0; i<4; i++) {
+        if (item == map->end())
+            return FAILURE;
+        item = map->get(NULL);
+    }
+    map->destroy(map);
+    return SUCCESS;
+}
 int main() {
     if (test_SymTable() != SUCCESS)
         return FAILURE;
@@ -130,6 +195,8 @@ int main() {
     if (test_IList() != SUCCESS)
         return FAILURE;
     if (test_EWList() != SUCCESS)
+        return FAILURE;
+    if (test_MnMap() != SUCCESS)
         return FAILURE;
     return SUCCESS;
 }

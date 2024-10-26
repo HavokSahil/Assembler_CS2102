@@ -19,6 +19,7 @@
 
 #include <common_types.h>
 #include <common_ds.h>
+#include <stdio.h>
 #include <tokenizer/tokenizer.h>
 
 /* -------------------------------------------------------
@@ -35,6 +36,7 @@
 #define _PSR_TYPE_JAR_INSTRUCTION	0xC8
 #define _PSR_TYPE_JAR_DATA_DECL		0xC9
 #define _PSR_TYPE_JAR_ERR					0xCA
+#define _PSR_TYPE_JAR_LABL_INSTR	0xCB
 
 
 #define _PSR_ERR_INV_MNEMO				0xD0

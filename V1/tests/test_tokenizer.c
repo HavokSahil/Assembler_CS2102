@@ -1,4 +1,4 @@
-#include "tokenizer.h"
+#include <tokenizer/tokenizer.h>
 #include <time.h>
 
 #define SUCCESS 0
@@ -105,9 +105,12 @@ int test_tokenizer_interface() {
 int main() {
     if (test_cargo() != SUCCESS)
         return FAILURE;
+    printf("DEBUG: 1\n");
     if (test_Jar() != SUCCESS)
         return FAILURE;
+    printf("DEBUG: 2\n");
     if (test_tokenizer_interface() != SUCCESS)
         return FAILURE;
+    printf("DEBUG: 3\n");
     return SUCCESS;
 }

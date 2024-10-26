@@ -85,8 +85,9 @@
  *********************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <common_types.h>
-#include <common_ds.h>
+#include "common_ds.h"
 #include <err_codes.h>
 
 /* --------------------------------------------------------
@@ -496,6 +497,9 @@ static void _ds_smap_print(_ds_smap_bucket* bucket) {
 }
 
 static _ds_smap_bucket* _ds_smap_insert_handler(const _ds_smap* map, _ds_smap_bucket* bucket, AAddr key, _ds_smap_node* node) {
+	if (bucket == NULL)	/* Hack Fix, neex to revisit the issue of NULL bucket when the bucket reaches root after fixup.   */
+		bucket = map->root;
+
 	if (bucket->key == key) {
 
 		 _ds_smap_bucket_insert(bucket, node);		/* Insert the node into the bucket */
@@ -552,6 +556,7 @@ static AErr _ds_smap_insert(_ds_smap* smap, const AString key, void* data) {	/* 
 		smap->root = bucket;
 		_ds_smap_bucket_insert(smap->root, node);
 		smap->size += 1;
+		
 		return SUCCESS;
 	}
 
@@ -906,6 +911,18 @@ static void _ds_map_next_iterator(_ds_map_node* node, _ds_queue* queue) {
 /**
  * The Functions for Instruction Item
  * -----------------------------------------*/
+void ds_destroy_IItem(IItem* item) {	/* Free the Instruction structure from memory   */
+	if (item == NULL)
+		return;
+
+	if (item->operand_1 != NULL)
+		free(item->operand_1);
+	if (item->operand_2 != NULL)
+		free(item->operand_2);
+
+	free(item);
+	item = NULL;
+}
 
 IItem *ds_new_IItem(AAddr address) {	/* Allocate new Instruction structure in memory   */
 	IItem* item = (IItem*)malloc(sizeof(IItem));
@@ -918,23 +935,8 @@ IItem *ds_new_IItem(AAddr address) {	/* Allocate new Instruction structure in me
 	item->operand_1 = NULL;
 	item->operand_2 = NULL;
 	item->comment = NULL;
-
+	item->destroy = ds_destroy_IItem;
 	return item;
-}
-
-void ds_destroy_IItem(IItem* item) {	/* Free the Instruction structure from memory   */
-	if (item == NULL)
-		return;
-
-	if (item->opcode != NULL)
-		free(item->opcode);
-	if (item->operand_1 != NULL)
-		free(item->operand_1);
-	if (item->operand_2 != NULL)
-		free(item->operand_2);
-
-	free(item);
-	item = NULL;
 }
 
 /**
@@ -1316,18 +1318,24 @@ void ds_destroy_DItem(DItem *ditem) {
  * The Functions for Data List
  * -----------------------------------------*/
 
-AErr ds_DList_insert(DList* dlist, AAddr address, AInt32 data) {
+AErr ds_DList_insert(DList* dlist, AInt32 data, AAddr *return_addr) {
 	if (dlist == NULL)
 		return ERR_INV_PTR;
 
 	if (dlist->map == NULL)
 		return ERR_INV_PTR;
 
+	AInt address = dlist->offset + dlist->base;
+	/* Size of incoming all data will be 4 byte for now.   */
+
 	DItem* ditem = ds_new_DItem(address, data);
 	if (ditem == NULL)
 		return ERR_ALLOC_FAILURE;
 
 	_ds_map* map = (_ds_map*)(dlist->map);
+
+	dlist->offset+=4;
+	*return_addr = address;
 
 	return _ds_map_insert(map, address, (void*)ditem);
 }
@@ -1450,6 +1458,8 @@ DList *ds_new_DList() {
 	}
 
 	dlist->map = (void*)map;
+	dlist->base = 0;
+	dlist->offset = 0;
 	dlist->insert = ds_DList_insert;
 	dlist->find = ds_DList_find;
 	dlist->empty = ds_DList_empty;
@@ -1605,6 +1615,459 @@ EWList *ds_new_EWList() {
 	elist->destroy = ds_destroy_EWList;
 
 	return elist;
+}
+
+/**
+ * The Functions for Mnemonic Item
+ * -----------------------------------------*/
+
+void ds_destroy_MnItem(MnItem *mitem) {
+	if (mitem == NULL)
+		return;
+
+	free(mitem);
+	mitem = NULL;
+}
+
+MnItem* ds_new_MnItem(AString key, AAddr encoding, ASize n_operand) {
+	MnItem* mitem = (MnItem*)malloc(sizeof(MnItem));
+	if (mitem == NULL)
+		return NULL;
+	
+	mitem->key = key;
+	mitem->encoding = encoding;
+	mitem->n_operand = n_operand;
+	mitem->destroy = ds_destroy_MnItem;
+	return mitem;
+}
+
+/**
+ * The Functions for Mnemonic Map
+ * -----------------------------------------*/
+
+AErr ds_MnMap_insert(MnMap* map, AString key, AAddr encoding, ASize n_operand) {
+	if (map == NULL)
+		return ERR_INV_PTR;
+
+	if (map->hashmap == NULL)
+		return ERR_INV_PTR;
+
+	_ds_smap* smap = (_ds_smap*)(map->hashmap);
+	MnItem* mitem = ds_new_MnItem(key, encoding, n_operand);
+	if (mitem == NULL)
+		return ERR_ALLOC_FAILURE;
+	
+	return _ds_smap_insert(smap, key, (void*)mitem);
+}
+
+MnItem* ds_MnMap_find(MnMap* map, AString key) {
+	if (map == NULL)
+		return NULL;
+
+	if (map->hashmap == NULL)
+		return NULL;
+
+	_ds_smap *smap = (_ds_smap*)(map->hashmap);
+	_ds_smap_node* node = _ds_smap_find(smap, key);
+
+	if (node == NULL)
+		return NULL;
+	
+	MnItem* mitem = (MnItem*)(node->data);
+	return mitem;
+}
+
+ABool ds_MnMap_empty(MnMap *map) {
+	if (map == NULL)
+		return TRUE;
+
+	if (map->hashmap == NULL)
+		return TRUE;
+
+	return _ds_smap_empty((_ds_smap*)(map->hashmap));
+}
+
+ASize ds_MnMap_size(MnMap *map) {
+	if (map == NULL)
+		return 0;
+	
+	if (map->hashmap == NULL)
+		return 0;
+
+	return _ds_smap_size((_ds_smap*)(map->hashmap));
+}
+
+void ds_destroy_MnMap(MnMap* map) {
+	if (map == NULL)
+		return;
+
+	if (map->hashmap != NULL) {
+		_ds_smap* smap = (_ds_smap*)(map->hashmap);
+		_ds_free_smap(smap);
+	}
+	
+	free(map);
+	map = NULL;
+}
+
+MnItem* ds_MnMap_get(MnMap* map) {
+	static MnMap* tptr = NULL;
+	static _ds_queue* queue = NULL;
+	static _ds_queue_node* bktnode = NULL;
+	static _ds_smap_node* node = NULL;
+	
+
+	if ((map == NULL) && (tptr == NULL)) {
+	/* If the Mnemonic Map is not provided and there is no back record   */
+		_ds_free_queue(queue, FALSE);
+		bktnode = NULL;
+		node = NULL;
+		return _END_MNMAP;
+	}
+	else if (map == NULL) {
+	/* If the Mnemonic Map is not provided and there is back record  */
+		if ((node != NULL) && (bktnode != NULL) && (queue != NULL)) {
+			if (node == ((_ds_smap_bucket*)(bktnode->data))->head) {
+					/* Bucket is finished */
+				bktnode = bktnode->next;
+				if (bktnode == NULL)
+					return _END_MNMAP;
+
+				_ds_smap_bucket* bucket = bktnode->data;
+				if (bucket == NULL)
+					return _END_MNMAP;
+
+				if (bucket->size == 0) {
+					bucket = NULL;
+					return _END_MNMAP;
+				}
+
+				node = bucket->head;
+				int i;
+				for (i = 0; i<bucket->size-1; i++) {
+					node = node->next;
+				}
+				
+			} else {
+				node = node->prev;
+				if (node == NULL)
+					return _END_MNMAP;
+			} 
+			
+			return (MnItem*)(node->data);
+		} else {
+			/*  Clean up all the mess  */
+			_ds_free_queue(queue, FALSE);
+			queue = NULL;
+			tptr = NULL;
+			bktnode = NULL;
+			node = NULL;
+			return _END_MNMAP;
+		} 
+	}
+	else if ((tptr == NULL) || (tptr != map)) {
+	/* If the Mnemonic Map is first introduced   */
+		tptr = map;
+		queue = _ds_get_queue();
+		if (queue == NULL)
+			return _END_MNMAP;
+	
+		if (map->hashmap == NULL)
+			return _END_MNMAP;
+
+		_ds_smap* smap = map->hashmap;
+		_ds_smap_bucket* root = smap->root;
+
+		if (root == NULL)
+			return _END_MNMAP;
+
+		_ds_smap_next_iterator(root, queue);
+		if (_ds_queue_size(queue) == 0) {
+			return _END_MNMAP;
+		}
+
+		bktnode = queue->front;
+
+		if (bktnode == NULL) 
+			return _END_MNMAP;
+	
+		_ds_smap_bucket* bucket = bktnode->data;
+		if (bucket == NULL) 
+			return _END_MNMAP;
+
+		
+		if (bucket->size == 0) 
+			return _END_MNMAP;
+		
+		/* If valid case reached finally filterer from above present error handlers  */
+		node = bucket->head;
+		int i;
+		for (i = 0; i<bucket->size-1; i++) {
+			node = node->next;
+		}
+
+		return (MnItem*)(node->data);
+	}
+}
+
+MnItem*  ds_MnMap_end() {
+	return _END_MNMAP;
+}
+
+MnMap *ds_new_MnMap() {
+	MnMap *map = (MnMap*)malloc(sizeof(MnMap));
+
+	if (map == NULL)
+		return NULL;
+
+	_ds_smap* smap = _ds_get_smap();
+	if (smap == NULL) {
+		ds_destroy_MnMap(map);
+		return NULL;
+	}
+
+	map->hashmap = (void*)smap;
+	map->insert = ds_MnMap_insert;
+	map->find = ds_MnMap_find;
+	map->empty = ds_MnMap_empty;
+	map->size = ds_MnMap_size;
+	map->get = ds_MnMap_get;
+	map->end = ds_MnMap_end;
+	map->destroy = ds_destroy_MnMap;
+
+	return map;
+}
+
+
+/**
+ * Functions for Register Item Data Structure  
+ * ----------------------------------------------*/
+void ds_destroy_RegItem(RegItem *ritem) {
+	if (ritem == NULL)
+		return;
+
+	free(ritem);
+	ritem = NULL;
+}
+
+RegItem* ds_new_RegItem(AString key, AAddr encoding) {
+	RegItem* ritem = (RegItem*)malloc(sizeof(RegItem));
+	if (ritem == NULL)
+		return NULL;
+	
+	ritem->key = key;
+	ritem->encoding = encoding;
+	ritem->destroy = ds_destroy_RegItem;
+	return ritem;
+}
+
+/**
+ * The Functions for Sym 
+ * -----------------------------------------*/
+
+AErr ds_RegMap_insert(RegMap* map, AString key, AAddr encoding) {
+	if (map == NULL)
+		return ERR_INV_PTR;
+
+	if (map->hashmap == NULL)
+		return ERR_INV_PTR;
+
+	_ds_smap* smap = (_ds_smap*)(map->hashmap);
+	AAddr* data = (AAddr*)malloc(sizeof(AAddr));
+	if (data == NULL)
+		return ERR_ALLOC_FAILURE;
+	
+	*data = encoding;
+	return _ds_smap_insert(smap, key, (void*)data);
+}
+
+AAddr ds_RegMap_find(RegMap* map, AString key) {
+	if (map == NULL)
+		return INVALID_ADDRESS;
+
+	if (map->hashmap == NULL)
+		return INVALID_ADDRESS;
+
+	_ds_smap *smap = (_ds_smap*)(map->hashmap);
+	_ds_smap_node* node = _ds_smap_find(smap, key);
+
+	if (node == NULL)
+		return INVALID_ADDRESS;
+	
+	AAddr* data = (AAddr*)(node->data);
+	return *data;
+}
+
+ABool ds_RegMap_empty(RegMap *map) {
+	if (map == NULL)
+		return TRUE;
+
+	if (map->hashmap == NULL)
+		return TRUE;
+
+	return _ds_smap_empty((_ds_smap*)(map->hashmap));
+}
+
+ASize ds_RegMap_size(RegMap *map) {
+	if (map == NULL)
+		return 0;
+	
+	if (map->hashmap == NULL)
+		return 0;
+
+	return _ds_smap_size((_ds_smap*)(map->hashmap));
+}
+
+void ds_destroy_RegMap(RegMap* map) {
+	if (map == NULL)
+		return;
+
+	if (map->hashmap != NULL) {
+		_ds_smap* smap = (_ds_smap*)(map->hashmap);
+		_ds_free_smap(smap);
+	}
+	
+	free(map);
+	map = NULL;
+}
+
+RegItem* ds_RegMap_get(RegMap* map) {
+	static RegMap* tptr = NULL;
+	static _ds_queue* queue = NULL;
+	static _ds_queue_node* bktnode = NULL;
+	static _ds_smap_node* node = NULL;
+	static RegItem* ritem = NULL;
+	
+	ds_destroy_RegItem(ritem);
+
+	if ((map == NULL) && (tptr == NULL)) {
+	/* If the Symbol Table is not provided and there is no back record   */
+		_ds_free_queue(queue, FALSE);
+		bktnode = NULL;
+		node = NULL;
+		return _END_SYMTB;
+	}
+	else if (map == NULL) {
+	/* If the Symbol Table is not provided and there is back record  */
+		if ((node != NULL) && (bktnode != NULL) && (queue != NULL)) {
+			if (node == ((_ds_smap_bucket*)(bktnode->data))->head) {
+					/* Bucket is finished */
+				bktnode = bktnode->next;
+				if (bktnode == NULL)
+					return _END_SYMTB;
+
+				_ds_smap_bucket* bucket = bktnode->data;
+				if (bucket == NULL)
+					return _END_SYMTB;
+
+				if (bucket->size == 0) {
+					bucket = NULL;
+					return _END_SYMTB;
+				}
+
+				node = bucket->head;
+				int i;
+				for (i = 0; i<bucket->size-1; i++) {
+					node = node->next;
+				}
+				
+			} else {
+				node = node->prev;
+				if (node == NULL)
+					return _END_SYMTB;
+			} 
+			ritem = ds_new_RegItem(node->key, *(AAddr*)node->data);
+			if (ritem == NULL) {
+				_ds_free_queue(queue, FALSE);
+				queue = NULL;
+				return _END_SYMTB;
+			}
+			return ritem;
+		} else {
+			/*  Clean up all the mess  */
+			_ds_free_queue(queue, FALSE);
+			queue = NULL;
+			tptr = NULL;
+			bktnode = NULL;
+			node = NULL;
+			return _END_SYMTB;
+		} 
+	}
+	else if ((tptr == NULL) || (tptr != map)) {
+	/* If the Symbol Table is first introduced   */
+		tptr = map;
+		queue = _ds_get_queue();
+		if (queue == NULL)
+			return _END_SYMTB;
+	
+		if (map->hashmap == NULL)
+			return _END_SYMTB;
+
+		_ds_smap* smap = map->hashmap;
+		_ds_smap_bucket* root = smap->root;
+
+		if (root == NULL)
+			return _END_SYMTB;
+
+		_ds_smap_next_iterator(root, queue);
+		if (_ds_queue_size(queue) == 0) {
+			return _END_SYMTB;
+		}
+
+		bktnode = queue->front;
+
+		if (bktnode == NULL) 
+			return _END_SYMTB;
+	
+		_ds_smap_bucket* bucket = bktnode->data;
+		if (bucket == NULL) 
+			return _END_SYMTB;
+
+		
+		if (bucket->size == 0) 
+			return _END_SYMTB;
+		
+		/* If valid case reached finally filterer from above present error handlers  */
+		node = bucket->head;
+		int i;
+		for (i = 0; i<bucket->size-1; i++) {
+			node = node->next;
+		}
+
+		ritem = ds_new_RegItem(node->key, *(AAddr*)node->data);
+		if (ritem == NULL)
+			return _END_SYMTB;
+
+		return ritem;
+	}
+}
+
+RegItem*  ds_RegMap_end() {
+	return _END_SYMTB;
+}
+
+RegMap *ds_new_RegMap() {
+	RegMap *map = (RegMap*)malloc(sizeof(RegMap));
+
+	if (map == NULL)
+		return NULL;
+
+	_ds_smap* smap = _ds_get_smap();
+	if (smap == NULL) {
+		ds_destroy_RegMap(map);
+		return NULL;
+	}
+
+	map->hashmap = (void*)smap;
+	map->insert = ds_RegMap_insert;
+	map->find = ds_RegMap_find;
+	map->empty = ds_RegMap_empty;
+	map->size = ds_RegMap_size;
+	map->get = ds_RegMap_get;
+	map->end = ds_RegMap_end;
+	map->destroy = ds_destroy_RegMap;
+
+	return map;
 }
 
 

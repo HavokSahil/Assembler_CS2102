@@ -46,7 +46,8 @@
 #define _END_DLIST NULL	/* The end pointer of Data List   */
 #define _END_SYMTB NULL	/* The end pointer of Symbol Table   */
 #define _END_EWLST NULL	/* The end pointer of Error/Warning List   */
-
+#define _END_MNMAP NULL
+#define _END_RGMAP NULL
 
 /* --------------------------------------------------------
  * Structures for Global Data Structures
@@ -55,11 +56,14 @@
 /* The structure for instruction item  */
 struct ds_instruction_struct {
 	AAddr address;	/* The address of instruction in the memory space  */
+	ASize lno;
 	ASize n_op;	/* The numbers of operand */
 	AString opcode;	/* The opcode in mnemonic form  */
 	AString operand_1;	/* The first operand (NULL if not exist)  */
 	AString operand_2;	/* The second operand (NULL if not exist)  */
 	AString comment;	/* The comment in the instruction (NULL if not exist)  */
+
+	void (*destroy)(struct ds_instruction_struct*);
 };
 
 typedef struct ds_instruction_struct IItem;
@@ -125,8 +129,9 @@ typedef struct ds_ilist_struct IList;
 /* The Data List Data Structure  */
 struct ds_dlist_struct {
 	void* map;	/*   */
-
-	AErr (*insert)(struct ds_dlist_struct*, AAddr, AInt32);	/*   */
+	ASize base;
+	ASize offset;
+	AErr (*insert)(struct ds_dlist_struct*, AInt32, AAddr*);	/*   */
 	DItem* (*find)(struct ds_dlist_struct*, AAddr);	/*   */
 	ABool (*empty)(struct ds_dlist_struct*);	/*   */
 	ASize (*size)(struct ds_dlist_struct*);	/*   */
@@ -153,6 +158,55 @@ struct ds_ewlist_struct {
 
 typedef struct ds_ewlist_struct EWList;
 
+/* The Register Item Data Structure  */
+struct ds_reg_item_struct {
+	AString key;
+	AAddr encoding;
+	void (*destroy)(struct ds_reg_item_struct*);												/*   */
+};
+
+typedef struct ds_reg_item_struct RegItem;
+
+/* The Register Map Data Structure  */
+struct ds_reg_map_struct {
+	void* hashmap;
+
+	AErr (*insert)(struct ds_reg_map_struct*, AString, AAddr);					/*   */
+	AAddr (*find)(struct ds_reg_map_struct*, AString);									/*   */
+	ABool (*empty)(struct ds_reg_map_struct*);													/*   */
+	ASize (*size)(struct ds_reg_map_struct*);														/*   */
+	RegItem* (*get)(struct ds_reg_map_struct*);													/*   */
+	RegItem* (*end)(void);																							/*   */
+	void (*destroy)(struct ds_reg_map_struct*);													/*   */
+};
+
+typedef struct ds_reg_map_struct RegMap;
+
+/* The Mnemonic Item Data Structure  */
+struct ds_mnemo_item_struct {
+	AString key;
+	AAddr encoding;		/* The machine code value for the mnemonic   */
+	ASize n_operand;		/* The number of operands that mnemonic expects */
+
+	void (*destroy)(struct ds_mnemo_item_struct*);
+};
+
+typedef struct ds_mnemo_item_struct MnItem;
+
+/* The Mnemonic Map Data Structure  */
+struct ds_mnemo_map_struct {
+	void* hashmap;	/*   */
+
+	AErr (*insert)(struct ds_mnemo_map_struct*, AString, AAddr, ASize);	/*   */
+	AAddr (*find)(struct ds_mnemo_map_struct*, AString);								/*   */
+	ABool (*empty)(struct ds_mnemo_map_struct*);												/*   */
+	ASize (*size)(struct ds_mnemo_map_struct*);													/*   */
+	MnItem* (*get)(struct ds_mnemo_map_struct*);												/*   */
+	MnItem* (*end)(void);																								/*   */
+	void (*destroy)(struct ds_mnemo_map_struct*);												/*   */
+};
+
+typedef struct ds_mnemo_map_struct MnMap;
 
 /* -----------------------------------------------
  * The Functions for Global Data Structures
@@ -162,60 +216,56 @@ typedef struct ds_ewlist_struct EWList;
  * the functions for instruction item
  * -----------------------------------------*/
 IItem *ds_new_IItem(AAddr);	/* allocate new Instruction Item  */
-void ds_destroy_IItem(IItem*);	/* free the allocated Instruction Item  */
 
 /**
  * the functions for Data Item 
  * -----------------------------------------*/
 DItem *ds_new_DItem(AAddr, AInt32);	/*   */
-void ds_destroy_DItem(DItem*);	/*   */
 
 /**
  * the functions for Error/Warning Item 
  * -----------------------------------------*/
 EWItem *ds_new_EWItem(ASize, ASize, AErr);	/*   */
-void ds_destroy_EWItem(EWItem*);	/*   */
 
+/**
+ * The Function for Mnemonic Item 
+ * -----------------------------------------*/
+MnItem *ds_new_MnItem(AString, AAddr, ASize);
+
+/**
+ * The Function for Register Item */
+RegItem* ds_new_RegItem(AString, AAddr);
 
 /**
  * The Functions for Symbol Table
  * -----------------------------------------*/
 SymTable *ds_new_SymTable();	/*   */
-void ds_destroy_SymTable(SymTable*);	/*   */
-AErr ds_SymTable_insert(SymTable*, AString, AAddr);	/*   */
-AAddr ds_SymTable_find(SymTable*, AString);	/*   */
-ABool ds_SymTable_empty(SymTable*);	/*   */
-ASize ds_SymTable_size(SymTable*);	/*   */
 
 /**
  * The Functions for Instruction List
  * -----------------------------------------*/
 IList *ds_new_IList();	/*   */
-void ds_destroy_IList(IList*);	/*   */
-AErr ds_IList_insert(IList*, IItem*);	/*   */
-IItem *ds_IList_find(IList*, AAddr);	/*   */
-ABool ds_IList_empty(IList*);	/*   */
-ASize ds_IList_size(IList*);	/*   */
-
 
 /**
  * The Functions for Data List
  * -----------------------------------------*/
 DList *ds_new_DList();	/*   */
-void ds_destroy_DList(DList*);	/*   */
-AErr ds_DList_insert(DList*, AAddr, AInt32);	/*   */
-DItem *ds_DList_find(DList*, AAddr);	/*   */
-ABool ds_DList_empty(DList*);	/*   */
-ASize ds_DList_size(DList*);	/*   */
 
 /**
  * The Functions for Error/Warning List
  * -----------------------------------------*/
 EWList *ds_new_EWList();	/*   */
-void ds_destroy_EWList(EWList*);	/*   */
-AErr ds_EWList_insert(EWList*, EWItem*);	/*   */
-EWItem *ds_EWList_find(EWList*, ASize);	/*   */
-ABool ds_EWList_empty(EWList*);	/*   */
-ASize ds_EWList_size(EWList*);	/*   */
+
+/**
+ * The Function for MnemonicHashMap
+ * ----------------------------------------*/
+MnMap *ds_new_MnMap();	/*   */
+
+/**
+ * The Function for Register Map
+ * ---------------------------------------*/
+RegMap *ds_new_RegMap();	/*   */
+
+
 
 #endif

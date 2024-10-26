@@ -1,1 +1,6 @@
-int test_overlord();
+#include <parser/parser.h>
+
+int test() {
+	return SUCCESS;
+}
+

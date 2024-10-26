@@ -1,3 +1,4 @@
-#include "decoder.h"
+int test_decoder() {
 
-int test_decoder() {return 0;}
+	return 0;
+}

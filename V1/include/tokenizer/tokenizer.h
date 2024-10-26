@@ -133,6 +133,8 @@ struct tk_tokenizer_interface {
 typedef struct tk_tokenizer_interface TokInterface;
 
 
+int test_tokenizer();
+
 /*----------------------------------------
  *	Main Functions for Tokenizer
  *----------------------------------------*/
@@ -142,7 +144,6 @@ TokInterface* tk_new_TokInterface(FILE*, ASize);
 /*----------------------------------------
  *	Other Functions for Tokenizer
  *----------------------------------------*/
-
 
 
 /**

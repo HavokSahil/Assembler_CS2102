@@ -1,3 +1,7 @@
+
+#include <parser/parser.h>
+
 int main() {
-	return 0;
+
+	return SUCCESS;
 }
