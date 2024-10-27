@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <apsr.h>
-#include <utils.h>
+#include <parser/parser.h>
+#include <decoder/decoder.h>
+#include <logger/logger.h>
+#include <common_ds.h>
+#include <common_types.h>
+#include <err_codes.h>
 
 /* Functions declaration  */
-int execute_argument();
+AErr execute_argument();
 void handle_error_and_execute_argument(int error_code);
 
 static Args parsed_args = {0};
@@ -29,6 +34,9 @@ void handle_error_and_execute_argument(int error_code) {
             /* help is displayed in this case  */
             printf("Help is displayed.\n");
             break;
+		case _ARG_ATTR_MNE:
+			execute_argument();
+			break;
         case _ARG_ATTR_RNM:
             printf("Argument requirement not met.\n");
             break;
@@ -49,34 +57,130 @@ void handle_error_and_execute_argument(int error_code) {
     }
 }
 
-int execute_argument() {
+typedef struct {
+    AString mnemonic;
+    AAddr encoding;
+    ASize n_operand;
+    AType operand_type;
+} Rule;
+
+typedef struct {
+    AString key;
+    AAddr encoding;
+} Register;
+
+AErr execute_argument() {
     char *input_file = parsed_args.input_filename;
     char *output_file = (parsed_args.output == 1)? parsed_args.output_filename: "machine.bin";
     char *alf_file = (parsed_args.alf == 1)? parsed_args.alf_filename: NULL;
     
-    /* Allocate memories  */ 
-    SynTree *tree = create_synTree(NULL);
-    SymTable *table = create_symTable();
-    DatMem *datmem = create_datMem();
-    S2IHMap *mnemonic_map = get_mnemonic_map();
-    AMsgList *msglist = create_new_amsg_list();
-    InstrList *ilist = create_new_instruction_list();
-    
-    int result = asm_systemizer(input_file, tree, table, datmem, mnemonic_map, msglist);
-    if (result == SUCCESS) {
-        judge_instructions(tree, table, datmem, mnemonic_map);
-        check_error(tree, msglist, ilist);
 
-        FILE *output = fopen(output_file, "w");
-        if (output != NULL) {
-            print_machine_instruction(ilist, output);
-            fclose(output);
-        }
-        if (parsed_args.alf) {  
-            result = generate_advanced_listing_file(alf_file, tree, table, msglist);
-            return result;
-        }
-    } else {
-        return FAILURE;
+    IList* ilist = ds_new_IList();
+    DList* dlist = ds_new_DList();
+    SymTable* stable = ds_new_SymTable();
+    MnMap* map = ds_new_MnMap();
+    EWList* elist = ds_new_EWList();
+    RegMap* regmap = ds_new_RegMap();
+    
+    /* Add Instuctions  */
+    Rule rules[19] = {
+        {"ldc", 0, 1, TYPE_MNE_OPERAND_VALUE},
+        {"adc", 1, 1, TYPE_MNE_OPERAND_VALUE},
+        {"ldl", 2, 1, TYPE_MNE_OPERAND_VALUE},
+        {"stl", 3, 1, TYPE_MNE_OPERAND_VALUE},
+        {"ldnl", 4, 1, TYPE_MNE_OPERAND_VALUE},
+        {"stnl", 5, 1, TYPE_MNE_OPERAND_VALUE},
+        {"add", 6, 0, TYPE_MNE_OPERAND_NONE},
+        {"sub", 7, 0, TYPE_MNE_OPERAND_NONE},
+        {"shl", 8, 0, TYPE_MNE_OPERAND_NONE},
+        {"shr", 9, 0, TYPE_MNE_OPERAND_NONE},
+        {"adj", 10, 1, TYPE_MNE_OPERAND_VALUE},
+        {"a2sp", 11, 0, TYPE_MNE_OPERAND_NONE},
+        {"sp2a", 12, 0, TYPE_MNE_OPERAND_NONE},
+        {"call", 13, 1, TYPE_MNE_OPERAND_OFFSET},
+        {"return", 14, 0, TYPE_MNE_OPERAND_NONE},
+        {"brz", 15, 1, TYPE_MNE_OPERAND_OFFSET},
+        {"brlz", 16, 1, TYPE_MNE_OPERAND_OFFSET},
+        {"br", 17, 1, TYPE_MNE_OPERAND_OFFSET},
+        {"HALT", 18, 0}
+    };
+
+	Register registers[10] = {
+        {"$s0", 0},
+        {"$s1", 1},
+        {"$s2", 2},
+        {"$s3", 3},
+        {"$s4", 4},
+        {"$s5", 5},
+        {"$s6", 6},
+        {"$s7", 7},
+        {"$s8", 8},
+        {"$s9", 9},
+    };
+
+
+	AInt j;
+    for (j = 0; j<19; j++) {
+        if (map->insert(map, rules[j].mnemonic, rules[j].encoding, rules[j].n_operand, rules[j].operand_type) != SUCCESS)
+            return ERR_MAIN_EXECUTION;
     }
+
+    for (j = 0; j<10; j++) {
+        if (regmap->insert(regmap, registers[j].key, registers[j].encoding) != SUCCESS)
+        return ERR_MAIN_EXECUTION;
+    }
+
+	FILE* file_input = fopen(input_file, "r");
+	FILE* file_output = fopen(output_file, "w");
+	FILE* file_alf = fopen(alf_file, "w");
+	
+	LoggerInterface* li = lg_new_LoggerInterface(stdout, stdout, 0, elist, ilist, stable, dlist, map, regmap);
+	if (li == NULL)
+        return ERR_MAIN_EXECUTION;
+
+	if (parsed_args.mnemonic == 1) {
+		li->logmn(li);
+		return SUCCESS;
+	}
+
+
+	if (parsed_args.input == 1 && file_input == NULL)
+		return ERR_MAIN_EXECUTION;
+	if (parsed_args.output == 1 && file_output == NULL)
+		return ERR_MAIN_EXECUTION;
+	if (parsed_args.alf == 1 && file_alf == NULL)
+		return ERR_MAIN_EXECUTION;
+
+	ParserInterface* pi = psr_new_ParserInterface(ilist, elist, stable, dlist, map, regmap, file_input);
+    if (pi == NULL)
+        return ERR_MAIN_EXECUTION;
+
+	DecoderInterface* di = dc_new_DecoderInterface(ilist, stable, dlist, map, regmap, elist);
+    if (di == NULL)
+        return ERR_MAIN_EXECUTION;
+
+	if (pi->parse(pi, file_input) != SUCCESS)
+		return ERR_MAIN_EXECUTION;
+	
+	if (di->decode(di, file_output) != SUCCESS)
+		return ERR_MAIN_EXECUTION;
+	
+
+	li->log(li, 0);
+
+	if (parsed_args.alf == 1)
+		li->generate_alf(li, di, file_alf);
+
+	if (file_input)
+		fclose(file_input);
+	if (file_output)
+		fclose(file_output);
+	if (file_alf)	
+		fclose(file_alf);
+
+	pi->destroy(pi);
+	di->destroy(di);
+	li->destroy(li);
+
+	return SUCCESS;
 }

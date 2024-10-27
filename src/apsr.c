@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <apsr.h>
 
-static ArgOpt options[6] = {
+static ArgOpt options[7] = {
     {'o', "output", 1, 1, "filename", "Specify the output file"},
     {'i', "input", 1, 1, "filename", "Specify the input file"},
     {'a', "alf", 0, 1, "filename", "Specify the advanced linking file"},
+    {'m', "mnemonic", 0, 0, NULL, "Shows the mnemonic lists of supported opcode"},
     {'v', "verbose", 0, 0, NULL, "Increase verbosity"},
     {'h', "help", 0, 0, NULL, "Show help text"},
     {0, NULL, 0, 0, NULL, NULL}  
@@ -30,6 +31,9 @@ int parse_arguments(int argc, char **argv, Args *parsed_args) {
                         return _ARG_ATTR_HD;
                     } else if (strcmp(flag, _ARG_FL_VERBOSE) == 0) {
                         parsed_args->verbose = 1;
+                    } else if (strcmp(flag, _ARG_FL_MNEMONIC) == 0) {
+                        parsed_args->mnemonic = 1;
+                        return _ARG_ATTR_MNE;
                     } else if (strcmp(flag, _ARG_FL_OUTPUT) == 0) {
                         last_arg = _ARG_CHR_OUTPUT;
                         stack_on = 1;
@@ -52,6 +56,9 @@ int parse_arguments(int argc, char **argv, Args *parsed_args) {
                         return _ARG_ATTR_HD;
                     } else if (strcmp(flag, _ARG_FS_VERBOSE) == 0) {
                         parsed_args->verbose = 1;
+                    } else if (strcmp(flag, _ARG_FS_MNEMONIC) == 0) {
+                        parsed_args->mnemonic = 1;
+                        return _ARG_ATTR_MNE;
                     } else if (strcmp(flag, _ARG_FS_INPUT) == 0) {
                         last_arg = _ARG_CHR_INPUT;
                         stack_on = 1;
@@ -130,4 +137,5 @@ void show_help_text(char *exec_name) {
     }
     printf("\n");
 }
+
 

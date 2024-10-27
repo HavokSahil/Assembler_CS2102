@@ -19,6 +19,7 @@ struct _arg_choices {
 	int alf;	/* advanced linking file choice */	
 	char *alf_filename;
 
+	int mnemonic;	/* Shows the mnemonic for supported operands */
 	/* Other non-necessary arguments */
 	int verbose;	/* increase the verbosity of output  */	
 	int help;			/* show help or not  */	
@@ -38,6 +39,7 @@ typedef struct _arg_choices Args;
 #define _ARG_ATTR_ONP 0x24	/* output file not provided  */ 
 #define _ARG_ATTR_ALF 0x25	/* alf file not provided */	
 #define _ARG_ATTR_HD	0x26	/* help has been displaed, suspend all activity */	
+#define _ARG_ATTR_MNE 0x27
 
 #define _ARG_HELP 	0x10
 #define	_ARG_INPUT 	0x11
@@ -48,6 +50,7 @@ typedef struct _arg_choices Args;
 /* Definations for long argument flag  */
 #define _ARG_FL_HELP "--help"
 #define _ARG_FL_VERBOSE "--verbose"
+#define _ARG_FL_MNEMONIC "--mnemonic"
 #define _ARG_FL_INPUT "--input"
 #define _ARG_FL_OUTPUT "--output"
 #define _ARG_FL_ALF "--alf"
@@ -55,6 +58,7 @@ typedef struct _arg_choices Args;
 /* Definations for short argument flag  */
 #define _ARG_FS_HELP "-h"
 #define _ARG_FS_VERBOSE "-v"
+#define _ARG_FS_MNEMONIC "-m"
 #define _ARG_FS_INPUT "-i"
 #define _ARG_FS_OUTPUT "-o"
 #define _ARG_FS_ALF "-a"
@@ -62,10 +66,10 @@ typedef struct _arg_choices Args;
 /* Definations for argument character  */
 #define _ARG_CHR_HELP 'h'
 #define _ARG_CHR_VERBOSE 'v'
+#define _ARG_CHR_MNEMONIC 'm'
 #define _ARG_CHR_INPUT 'i'
 #define _ARG_CHR_OUTPUT 'o'
 #define _ARG_CHR_ALF 'a'
 
 int parse_arguments(int argc, char **argv, Args *parsed_args);
 void show_help_text(char *exec_name);
-
