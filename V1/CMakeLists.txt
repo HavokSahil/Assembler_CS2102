@@ -79,7 +79,7 @@ add_library(logger_lib ${SRC_DIR}/logger/logger.c ${SRC_DIR}/common_ds.c ${SRC_D
 target_include_directories(logger_lib PUBLIC ${INCLUDE_DIR})
 
 # Create the main executable
-add_executable(Assembler ${SRC_DIR}/main.c ${SRC_DIR}/overlord.c ${SRC_DIR}/common_ds.c)
+add_executable(Assembler ${SRC_DIR}/main.c ${SRC_DIR}/overlord.c ${SRC_DIR}/common_ds.c ${SRC_DIR}/apsr.c)
 
 # Link libraries to the main executable
 target_link_libraries(Assembler PRIVATE

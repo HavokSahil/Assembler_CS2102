@@ -76,6 +76,9 @@
 #define ERR_LOG_FAIL 0x26
 #define ERR_LOG_INVALID_STREAM 0x27
 
+/* Error Codes for Execution */
+#define ERR_MAIN_EXECUTION 0x28
+
 
 /* Warnings for Parser*/
 #define WARN_PSR_INVALID_JAR_TYPE 0x40
