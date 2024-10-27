@@ -44,7 +44,7 @@ int test_parser_interface() {
 
     AInt j;
     for (j = 0; j<19; j++) {
-        if (map->insert(map, rules[j].mnemonic, rules[j].encoding, rules[j].n_operand))
+        if (map->insert(map, rules[j].mnemonic, rules[j].encoding, rules[j].n_operand, TYPE_MNE_OPERAND_NONE))
             return FAILURE;
     }
 

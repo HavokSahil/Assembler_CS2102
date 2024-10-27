@@ -21,37 +21,7 @@
 #include <common_ds.h>
 #include <stdio.h>
 #include <tokenizer/tokenizer.h>
-
-/* -------------------------------------------------------
- * Definations for Parser
- * -------------------------------------------------------*/
-#define _PSR_STATUS_READY 0xC1
-#define _PSR_STATUS_ERR		0xC2
-
-#define _PSR_TYPE_JAR_LABEL				0xC3
-#define _PSR_TYPE_JAR_SET_DIRECT	0xC4
-#define _PSR_TYPE_JAR_SEC_DIRECT	0xC5
-#define _PSR_TYPE_JAR_DAT_DIRECT 	0xC6
-#define _PSR_TYPE_JAR_TEX_DIRECT 	0xC7
-#define _PSR_TYPE_JAR_INSTRUCTION	0xC8
-#define _PSR_TYPE_JAR_DATA_DECL		0xC9
-#define _PSR_TYPE_JAR_ERR					0xCA
-#define _PSR_TYPE_JAR_LABL_INSTR	0xCB
-
-
-#define _PSR_ERR_INV_MNEMO				0xD0
-#define _PSR_ERR_INV_OPRND				0xD1
-#define _PSR_ERR_FMT_OPRND				0xD2
-#define _PSR_ERR_FMT_DDATA				0xD3
-#define _PSR_ERR_MIS_SETDA				0xD4
-#define _PSR_ERR_MIS_OPRND				0xD5
-#define _PSR_ERR_MIS_DDATA				0xD6
-#define _PSR_ERR_MMT_OPRND				0xD7
-#define _PSR_ERR_INV_LABEL				0xD8
-#define _PSR_ERR_DUP_LABEL				0xD9
-#define _PSR_ERR_INV_JRTYP 				0xDA
-
-#define _PSR_BUFF_OPRND_SIZE			64
+#include <err_codes.h>
 
 /* -------------------------------------------------------
  * Defining Syntax Rules for Parser

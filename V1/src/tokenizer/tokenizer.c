@@ -48,8 +48,8 @@ Token* tk_new_Token(AType type, AString token) {
 
 	tk->type = type;
 	tk->token = token;
-	tk->lno = _TOK_LINE_UNSET;
-	tk->cno = _TOK_COL_UNSET;
+	tk->lno = UNSET_TOK_LINE;
+	tk->cno = UNSET_TOK_COL;
 
 	tk->destroy = tk_destroy_Token;
 
@@ -78,10 +78,10 @@ void tk_destroy_Jar(Jar* jar) {
 
 AErr tk_Jar_put(Jar* jar, Token* token) {
 	if (jar == NULL)
-		return ERR_INV_PTR;
+		return ERR_TOK_INVALID_JAR;
 
 	if (token == NULL)
-		return SUCCESS;	/* Implement warning code instead (v1)   */
+		return ERR_TOK_INVALID_JAR;
 	
 	int i;
 	Token* cur = jar->tokens;
@@ -98,7 +98,7 @@ AErr tk_Jar_put(Jar* jar, Token* token) {
 
 Token* tk_Jar_get(const Jar* jar, ASize index) {
 	if (jar == NULL)
-		return ERR_INV_PTR;
+		return ERR_TOK_INVALID_JAR;
 	if ((index>=jar->size) || (index<0))
 		return NULL;
 
@@ -107,7 +107,7 @@ Token* tk_Jar_get(const Jar* jar, ASize index) {
 	int i;
 	for (i = 0; i<index; i++) {
 		if (cur == NULL)
-			return ERR_INV_PTR;
+			return ERR_TOK_INVALID_TOKEN;
 		cur = cur->next;
 	}
 
@@ -194,13 +194,13 @@ void tk_destroy_Cargo(Cargo* cargo, ABool erase_content) {
 
 AErr tk_Cargo_load(Cargo* cargo, ASize lno, void* stuff) {
 	if (cargo == NULL)
-		return ERR_INV_PTR;
+		return ERR_TOK_INVALID_CARGO;
 	if (stuff == NULL)
 		return SUCCESS;	/* Add Warning instead for Null pointer insertion  */
 
 	Packet* packet = tk_new_Packet(stuff, lno);
 	if (packet == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_TOK_INVALID_PACKET;
 
 	if (cargo->front == NULL) {
 		cargo->front = packet;
@@ -285,7 +285,7 @@ static ABool _tk_TokInterface_ignorable_check(AString line) {	/* Returns True if
 	ABool non_comment = FALSE;
 
 	for (i = 0; i<length; i++) {
-		if (line[i] == '#') {
+		if (line[i] == SEPARATOR_COMMENT) {
 			if (non_comment == TRUE)
 				return FALSE;
 			else
@@ -317,7 +317,7 @@ static void _tk_Tokenizer_remove_comment(AString line) {
 	ASize length = strlen(line);
 	ASize i;
 	for (i = 0; i<length; i++) {
-		if (line[i] == '#') {
+		if (line[i] == SEPARATOR_COMMENT) {
 			line[i] = '\0';
 			return;
 		}
@@ -329,7 +329,7 @@ static ABool _tk_Tokenizer_check_label(const AString line) {
 		return FALSE;
 
 	ASize buffSize = strlen(line);
-	buffSize = (buffSize+1 >= _TOK_LINE_BUFF_SZ)? _TOK_LINE_BUFF_SZ: buffSize+1;
+	buffSize = (buffSize+1 >= SZ_TOK_LINE_BUFF)? SZ_TOK_LINE_BUFF: buffSize+1;
 	AString buffer = (AString)malloc(buffSize);
 	/* Do something about this   */
 	if (buffer == NULL)
@@ -371,17 +371,17 @@ static ABool _tk_Tokenizer_check_label(const AString line) {
 static AErr _tk_Tokenizer_put_tokens(Jar* jar, const AString line) {	/* Function to add non comments tokens into jar   */
 
 	if (jar == NULL)
-		return FAILURE;
+		return ERR_TOK_INVALID_JAR;
 
 	if (line == NULL)
-		return FAILURE;
+		return ERR_STR_INVALID_STRING;
 	
 	ASize buffSize = strlen(line) + 1;
-	buffSize = (buffSize > _TOK_LINE_BUFF_SZ)? _TOK_LINE_BUFF_SZ: buffSize;
+	buffSize = (buffSize > SZ_TOK_LINE_BUFF)? SZ_TOK_LINE_BUFF: buffSize;
 	AString buff = (AString)malloc(buffSize);
 	/* Do something about this  repeated buffer allocations if possible */
 	if (buff == NULL)
-		return FAILURE;
+		return ERR_MEM_ALLOC_FAIL;
 
 	memcpy(buff, line, buffSize);
 	buff[buffSize - 1] = '\0';
@@ -395,29 +395,29 @@ static AErr _tk_Tokenizer_put_tokens(Jar* jar, const AString line) {	/* Function
 	token = strtok_r(buff, delim, &save_ptr);
 
 	if (token == NULL)
-		return FAILURE;
+		return ERR_TOK_INVALID_TOKEN;
 
 	ASize col = 1;
 	/* Label type token detected. Put it first into the jar   */
 	ABool result = _tk_Tokenizer_check_label(line);
 	if (result == TRUE) {
 		ASize length = strlen(token);
-		length = (length+1 >= _TOK_TOKEN_LABEL_SIZE)? _TOK_TOKEN_LABEL_SIZE: length+1;
+		length = (length+1 >= SZ_TOK_TOKEN_LABEL)? SZ_TOK_TOKEN_LABEL: length+1;
 		AString label = (AString)malloc(length);
 		memcpy(label, token, length);
 		label[length-1] = '\0';	/* Pay careful attention here. Some bug fix might be needed   */
 
-		Token* tkn = tk_new_Token(_TOK_TYPE_LABEL, label);
+		Token* tkn = tk_new_Token(TYPE_TOK_LABEL, label);
 		if (tkn == NULL) {
 			free(label);
-			return ERR_ALLOC_FAILURE;
+			return ERR_TOK_INVALID_TOKEN;
 		}
 		tkn->lno = jar->lno;
 		tkn->cno = col++;
 		tkn->token = label;
 		if (jar->put(jar, tkn) != SUCCESS) {
 			tkn->destroy(tkn);
-			return FAILURE;
+			return ERR_DS_INSERT_FAIL;
 		}
 		token = strtok_r(NULL, delim, &save_ptr);	/* Handle the case of double `:`   */
 	} 
@@ -426,22 +426,22 @@ static AErr _tk_Tokenizer_put_tokens(Jar* jar, const AString line) {	/* Function
 	/* Add other mnemonics into the jar   */
 	while (token != NULL) {
 		ASize length = strlen(token);
-		length = (length+1 >= _TOK_TOKEN_LABEL_SIZE)? _TOK_TOKEN_LABEL_SIZE: length+1;
+		length = (length+1 >= SZ_TOK_TOKEN_MNEMONIC)? SZ_TOK_TOKEN_MNEMONIC: length+1;
 		AString mnemo = (AString)malloc(length);
 		memcpy(mnemo, token, length);
 		mnemo[length-1] = '\0';	/* Pay careful attention here. Some bug fix might be needed   */
 
-		Token* tkn = tk_new_Token(_TOK_TYPE_WORD, mnemo);
+		Token* tkn = tk_new_Token(TYPE_TOK_WORD, mnemo);
 		if (tkn == NULL) {
 			free(mnemo);
-			return ERR_ALLOC_FAILURE;
+			return ERR_DS_STRUCT_GEN_FAIL;
 		}
 		tkn->lno = jar->lno;
 		tkn->cno = col++;
 		tkn->token = mnemo;
 		if (jar->put(jar, tkn) != SUCCESS) {
 			tkn->destroy(token);
-			return FAILURE;
+			return ERR_DS_INSERT_FAIL;
 		}
 		token = strtok_r(NULL, delim, &save_ptr);
 	}
@@ -452,29 +452,29 @@ static AErr _tk_Tokenizer_put_tokens(Jar* jar, const AString line) {	/* Function
 static AErr _tk_TokInterface_loadPackets(TokInterface* ti) {	/* Function to load Lines into Cargo as Packets. */
 
 	if (ti == NULL)
-		return ERR_INV_PTR;
+		return ERR_INVALID_INTERFACE;
 
 	FILE* file = ti->file;
 	if (file == NULL)
-		return ERR_INV_PTR;
+		return ERR_FILE_INVALID_FILE;
 	
 	ASize lines_read = 0;
 	ASize cargo_size = 0;
 	AString buff = NULL;
-	while (lines_read<_TOK_CARGO_PKT_WIN) {
+	while (lines_read<SZ_TOK_CARGO_PKT_WIN) {
 
-		if (ti->cargo->size != _TOK_CARGO_PKT_WIN) {
-			buff = (AString)malloc(_TOK_LINE_BUFF_SZ);
+		if (ti->cargo->size != SZ_TOK_CARGO_PKT_WIN) {
+			buff = (AString)malloc(SZ_TOK_LINE_BUFF);
 		} else {
 			buff = ti->cargo->get(ti->cargo, lines_read);
 			if (buff == NULL)
-				buff = (AString)malloc(_TOK_LINE_BUFF_SZ);
+				buff = (AString)malloc(SZ_TOK_LINE_BUFF);
 		}
 
 		if (buff == NULL)
-			return ERR_ALLOC_FAILURE;
+			return ERR_MEM_ALLOC_FAIL;
 
-		if (fgets(buff, _TOK_LINE_BUFF_SZ, file) == NULL) {	/* If file ends and no content is read.  */
+		if (fgets(buff, SZ_TOK_LINE_BUFF, file) == NULL) {	/* If file ends and no content is read.  */
 			free(buff);
 			buff = NULL;
 			break;
@@ -485,7 +485,7 @@ static AErr _tk_TokInterface_loadPackets(TokInterface* ti) {	/* Function to load
 			continue;
 		}
 		if (ti->cargo->load(ti->cargo, lines_read + 1, (void*)buff) != SUCCESS)
-			return FAILURE;
+			return ERR_TOK_CARGO_LOAD_FAIL;
 
 		cargo_size++;
 		lines_read++;
@@ -510,21 +510,21 @@ static AString _tk_TokInterface_token_comment(const AString line) {
 	ABool comment = FALSE;
 	char* cur = line;
 	for (i = 0; i<length; i++) {
-		if (line[i] == '#') {
+		if (line[i] == SEPARATOR_COMMENT) {
 			comment = TRUE;
 			break;
 		}
 		cur = cur+1;
 	}
-	if (*cur != '#')
+	if (*cur != SEPARATOR_COMMENT)
 		return NULL;
 	
 	length = strlen(cur);
-	length = (length >= _TOK_TOKEN_COMMENT_SIZE)? _TOK_TOKEN_COMMENT_SIZE-1: length;
+	length = (length >= SZ_TOK_TOKEN_COMMENT)? SZ_TOK_TOKEN_COMMENT-1: length;
 	if (comment = FALSE)
 		return NULL;
 
-	AString buff = (AString)malloc(_TOK_TOKEN_COMMENT_SIZE);
+	AString buff = (AString)malloc(SZ_TOK_TOKEN_COMMENT);
 	if (buff == NULL)
 		return NULL;
 
@@ -555,7 +555,7 @@ static void* _tk_TokInterface_jar_maker(void* line_ptr, ASize lno) {	/* Function
 	AString comment = _tk_TokInterface_token_comment(line);
 	if (comment != NULL) {
 
-		Token* token = tk_new_Token(_TOK_TYPE_COMMENT, comment);	/* Always put token->token = value to since pointer is deallocated from stack   */
+		Token* token = tk_new_Token(TYPE_TOK_COMMENT, comment);	/* Always put token->token = value to since pointer is deallocated from stack   */
 		token->token = comment;
 
 		if (token == NULL)
@@ -573,10 +573,10 @@ static void* _tk_TokInterface_jar_maker(void* line_ptr, ASize lno) {	/* Function
 static AErr _tk_TokInterface_jarify(TokInterface* ti) {	/* The function to convert the Line Packets into Packets of Jars of Tokens   */
 
 	if (ti == NULL)
-		return ERR_INV_PTR;
+		return ERR_INVALID_INTERFACE;
 
 	if (ti->cargo == NULL)
-		return ERR_INV_PTR;
+		return ERR_TOK_INVALID_CARGO;
 
 	Cargo* cargo = ti->cargo;
 
@@ -584,11 +584,11 @@ static AErr _tk_TokInterface_jarify(TokInterface* ti) {	/* The function to conve
 	for (i = 0; i<cargo->size; i++) {
 		Packet* packet = _tk_Cargo_get_packet(cargo, i);
 		if (packet == NULL)
-			return FAILURE;
+			return ERR_DS_STRUCT_GEN_FAIL;
 	
 		Jar* jar = _tk_TokInterface_jar_maker(cargo->get(cargo, i), packet->lno);
 		if (jar == NULL) {
-			return FAILURE;
+			return ERR_DS_STRUCT_GEN_FAIL;
 		}
 		packet->content = (void*)jar;
 	}
@@ -600,22 +600,22 @@ AErr tk_TokInterface_fillCargo(TokInterface* ti, Cargo* cargo) {
 	ti->cargo = cargo;
 
 	if (_tk_TokInterface_loadPackets(ti) != SUCCESS)
-		return FAILURE;
+		return ERR_TOK_CARGO_LOAD_FAIL;
 
 	if (_tk_TokInterface_jarify(ti) != SUCCESS)
-		return FAILURE;
+		return ERR_TOK_JARIFICATION_FAIL;
 
 	return SUCCESS;
 }
 
-AInt tk_TokInterface_pwDone(TokInterface* ti) {
+AInt tk_TokInterface_pwDone(TokInterface* ti) {		/* Function to calculate the percentage of work done by the tokenizer   */
 	if (ti == NULL)
 		return -1;
 
 	return (AInt)((ti->current_pos * 100)/ti->file_size);
 }
 
-void tk_destroy_TokInterface(TokInterface* ti) {
+void tk_destroy_TokInterface(TokInterface* ti) {	/* Function to destroy the Tokenizer Interface   */
 	if (ti == NULL)
 		return;
 

@@ -228,11 +228,11 @@ static void _ds_free_queue(_ds_queue* queue, ABool wipedata) {
 
 AErr _ds_queue_insert(_ds_queue* queue, void* data) {	/* Function to insert into queue  */
 	if (queue == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	_ds_queue_node* node = _ds_get_queue_node(data);
 	if (node == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_DS_STRUCT_GEN_FAIL;
 
 	if (queue->size == 0) {	/* Queue is empty  */
 		queue->front = node;
@@ -538,19 +538,19 @@ static _ds_smap_bucket* _ds_smap_insert_handler(const _ds_smap* map, _ds_smap_bu
 
 static AErr _ds_smap_insert(_ds_smap* smap, const AString key, void* data) {	/* Funcion to insert into smap  */
 	if (smap == NULL) 
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	AAddr hash = djb2(key);
 	
 	_ds_smap_node *node = _ds_get_smap_node(key, data);
 	if (node == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_DS_STRUCT_GEN_FAIL;
 
 	if (smap->size == 0) {
 	/* if hashmap is empty */
 		_ds_smap_bucket *bucket = _ds_get_smap_bucket(hash);
 		if (bucket == NULL)
-			return ERR_ALLOC_FAILURE;
+			return ERR_DS_STRUCT_GEN_FAIL;
 		
 		bucket->color = BLACK;
 		smap->root = bucket;
@@ -562,7 +562,7 @@ static AErr _ds_smap_insert(_ds_smap* smap, const AString key, void* data) {	/* 
 
 	_ds_smap_bucket* bucket = _ds_smap_insert_handler(smap, smap->root, hash, node);
 	if (bucket == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_DS_INSERT_FAIL;
 
 	smap->size += 1;
 	return SUCCESS;
@@ -809,13 +809,13 @@ static void _ds_map_print(_ds_map_node* node) {
 
 AErr _ds_map_insert_handler(_ds_map_node* node, AAddr key, void* data) {
 	if (node->key == key) {
-		return ERR_DUPLICATE_NODE;
+		return ERR_MAP_DUP_KEY;
 	}
 	if (node->key > key) {
 		if (node->left == NULL) {
 			_ds_map_node* new_node = _ds_get_map_node(key, data);
 			if (new_node == NULL)
-				return ERR_ALLOC_FAILURE;
+				return ERR_DS_STRUCT_GEN_FAIL;
 			node->left = new_node;
 			return SUCCESS;
 		}
@@ -824,7 +824,7 @@ AErr _ds_map_insert_handler(_ds_map_node* node, AAddr key, void* data) {
 		if (node->right == NULL) {
 			_ds_map_node* new_node = _ds_get_map_node(key, data);
 			if (new_node == NULL)
-				return ERR_ALLOC_FAILURE;
+				return ERR_DS_STRUCT_GEN_FAIL;
 			node->right = new_node;
 			return SUCCESS;
 		}
@@ -834,13 +834,13 @@ AErr _ds_map_insert_handler(_ds_map_node* node, AAddr key, void* data) {
 
 AErr _ds_map_insert(_ds_map* map, AAddr key, void* data) {
 	if (map == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 	
 	if (map->size == 0) {
 		/* If size map is empty   */
 		_ds_map_node* node = _ds_get_map_node(key, data);
 		if (node == NULL)
-			return ERR_ALLOC_FAILURE;
+			return ERR_DS_STRUCT_GEN_FAIL;
 		map->root = node;
 		map->size = 1;
 		
@@ -945,13 +945,13 @@ IItem *ds_new_IItem(AAddr address) {	/* Allocate new Instruction structure in me
 
 AErr ds_IList_insert(IList* ilist, IItem* item) {	/* Function to insert item to Instruction List   */
 	if (ilist == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (ilist->queue == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (item == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 	
 	_ds_queue* queue = (_ds_queue*)(ilist->queue);
 	return _ds_queue_insert(queue, (void*)item);
@@ -1088,15 +1088,15 @@ SymItem* ds_new_SymItem(AString key, AAddr address) {
 
 AErr ds_SymTable_insert(SymTable* table, AString key, AAddr address) {
 	if (table == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (table->hashmap == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	_ds_smap* smap = (_ds_smap*)(table->hashmap);
 	AAddr* data = (AAddr*)malloc(sizeof(AAddr));
 	if (data == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_DS_STRUCT_GEN_FAIL;
 	
 	*data = address;
 	return _ds_smap_insert(smap, key, (void*)data);
@@ -1104,16 +1104,16 @@ AErr ds_SymTable_insert(SymTable* table, AString key, AAddr address) {
 
 AAddr ds_SymTable_find(SymTable* table, AString key) {
 	if (table == NULL)
-		return INVALID_ADDRESS;
+		return ERR_MAP_FIND_ADDRESS;
 
 	if (table->hashmap == NULL)
-		return INVALID_ADDRESS;
+		return ERR_MAP_FIND_ADDRESS;
 
 	_ds_smap *smap = (_ds_smap*)(table->hashmap);
 	_ds_smap_node* node = _ds_smap_find(smap, key);
 
 	if (node == NULL)
-		return INVALID_ADDRESS;
+		return ERR_MAP_FIND_ADDRESS;
 	
 	AAddr* data = (AAddr*)(node->data);
 	return *data;
@@ -1320,17 +1320,17 @@ void ds_destroy_DItem(DItem *ditem) {
 
 AErr ds_DList_insert(DList* dlist, AInt32 data, AAddr *return_addr) {
 	if (dlist == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (dlist->map == NULL)
-		return ERR_INV_PTR;
+		return ERR_MAP_INVALID_STRUCT;
 
 	AInt address = dlist->offset + dlist->base;
 	/* Size of incoming all data will be 4 byte for now.   */
 
 	DItem* ditem = ds_new_DItem(address, data);
 	if (ditem == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_DS_STRUCT_GEN_FAIL;
 
 	_ds_map* map = (_ds_map*)(dlist->map);
 
@@ -1342,15 +1342,15 @@ AErr ds_DList_insert(DList* dlist, AInt32 data, AAddr *return_addr) {
 
 DItem *ds_DList_find(DList *dlist, AAddr address) {
 	if (dlist == NULL)
-		return NULL;
+		return _END_DLIST;
 
 	if (dlist->map == NULL)
-		return NULL;
+		return _END_DLIST;
 
 	_ds_map* map = dlist->map;
 	_ds_map_node* node = _ds_map_find(map, address);
 	if (node == NULL)
-		return NULL;
+		return _END_DLIST;
 	
 	return (DItem*)(node->data);
 }
@@ -1501,7 +1501,7 @@ void ds_destroy_EWItem(EWItem* item) {
 
 AErr ds_EWList_insert(EWList* elist, EWItem* eitem) {
 	if (elist == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (elist->queue == NULL)
 		return NULL;
@@ -1629,7 +1629,7 @@ void ds_destroy_MnItem(MnItem *mitem) {
 	mitem = NULL;
 }
 
-MnItem* ds_new_MnItem(AString key, AAddr encoding, ASize n_operand) {
+MnItem* ds_new_MnItem(AString key, AAddr encoding, ASize n_operand, AType operand_type) {
 	MnItem* mitem = (MnItem*)malloc(sizeof(MnItem));
 	if (mitem == NULL)
 		return NULL;
@@ -1637,6 +1637,7 @@ MnItem* ds_new_MnItem(AString key, AAddr encoding, ASize n_operand) {
 	mitem->key = key;
 	mitem->encoding = encoding;
 	mitem->n_operand = n_operand;
+	mitem->operand_type = operand_type;
 	mitem->destroy = ds_destroy_MnItem;
 	return mitem;
 }
@@ -1645,17 +1646,17 @@ MnItem* ds_new_MnItem(AString key, AAddr encoding, ASize n_operand) {
  * The Functions for Mnemonic Map
  * -----------------------------------------*/
 
-AErr ds_MnMap_insert(MnMap* map, AString key, AAddr encoding, ASize n_operand) {
+AErr ds_MnMap_insert(MnMap* map, AString key, AAddr encoding, ASize n_operand, AType operand_type) {
 	if (map == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (map->hashmap == NULL)
-		return ERR_INV_PTR;
+		return ERR_MAP_INVALID_STRUCT;
 
 	_ds_smap* smap = (_ds_smap*)(map->hashmap);
-	MnItem* mitem = ds_new_MnItem(key, encoding, n_operand);
+	MnItem* mitem = ds_new_MnItem(key, encoding, n_operand, operand_type);
 	if (mitem == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_DS_STRUCT_GEN_FAIL;
 	
 	return _ds_smap_insert(smap, key, (void*)mitem);
 }
@@ -1867,15 +1868,15 @@ RegItem* ds_new_RegItem(AString key, AAddr encoding) {
 
 AErr ds_RegMap_insert(RegMap* map, AString key, AAddr encoding) {
 	if (map == NULL)
-		return ERR_INV_PTR;
+		return ERR_DS_INVALID_STRUCT;
 
 	if (map->hashmap == NULL)
-		return ERR_INV_PTR;
+		return ERR_MAP_INVALID_STRUCT;
 
 	_ds_smap* smap = (_ds_smap*)(map->hashmap);
 	AAddr* data = (AAddr*)malloc(sizeof(AAddr));
 	if (data == NULL)
-		return ERR_ALLOC_FAILURE;
+		return ERR_MEM_ALLOC_FAIL;
 	
 	*data = encoding;
 	return _ds_smap_insert(smap, key, (void*)data);
@@ -1883,20 +1884,21 @@ AErr ds_RegMap_insert(RegMap* map, AString key, AAddr encoding) {
 
 AAddr ds_RegMap_find(RegMap* map, AString key) {
 	if (map == NULL)
-		return INVALID_ADDRESS;
+		return _END_RGMAP;
 
 	if (map->hashmap == NULL)
-		return INVALID_ADDRESS;
+		return _END_RGMAP;
 
 	_ds_smap *smap = (_ds_smap*)(map->hashmap);
 	_ds_smap_node* node = _ds_smap_find(smap, key);
 
 	if (node == NULL)
-		return INVALID_ADDRESS;
+		return _END_RGMAP;
 	
 	AAddr* data = (AAddr*)(node->data);
 	return *data;
 }
+
 
 ABool ds_RegMap_empty(RegMap *map) {
 	if (map == NULL)
@@ -2043,7 +2045,7 @@ RegItem* ds_RegMap_get(RegMap* map) {
 }
 
 RegItem*  ds_RegMap_end() {
-	return _END_SYMTB;
+	return _END_RGMAP;
 }
 
 RegMap *ds_new_RegMap() {
@@ -2069,5 +2071,3 @@ RegMap *ds_new_RegMap() {
 
 	return map;
 }
-
-

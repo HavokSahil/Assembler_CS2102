@@ -46,8 +46,8 @@
 #define _END_DLIST NULL	/* The end pointer of Data List   */
 #define _END_SYMTB NULL	/* The end pointer of Symbol Table   */
 #define _END_EWLST NULL	/* The end pointer of Error/Warning List   */
-#define _END_MNMAP NULL
-#define _END_RGMAP NULL
+#define _END_MNMAP 0xFFFFFFFF	/* The end pointer of Mnemonic Map   */
+#define _END_RGMAP NULL	/* The end pointer of Register Map   */
 
 /* --------------------------------------------------------
  * Structures for Global Data Structures
@@ -187,6 +187,7 @@ struct ds_mnemo_item_struct {
 	AString key;
 	AAddr encoding;		/* The machine code value for the mnemonic   */
 	ASize n_operand;		/* The number of operands that mnemonic expects */
+	AType operand_type;	/* The type of operand that mnemonic expects offset or value */
 
 	void (*destroy)(struct ds_mnemo_item_struct*);
 };
@@ -197,7 +198,7 @@ typedef struct ds_mnemo_item_struct MnItem;
 struct ds_mnemo_map_struct {
 	void* hashmap;	/*   */
 
-	AErr (*insert)(struct ds_mnemo_map_struct*, AString, AAddr, ASize);	/*   */
+	AErr (*insert)(struct ds_mnemo_map_struct*, AString, AAddr, ASize, AType);	/*   */
 	AAddr (*find)(struct ds_mnemo_map_struct*, AString);								/*   */
 	ABool (*empty)(struct ds_mnemo_map_struct*);												/*   */
 	ASize (*size)(struct ds_mnemo_map_struct*);													/*   */
@@ -230,7 +231,7 @@ EWItem *ds_new_EWItem(ASize, ASize, AErr);	/*   */
 /**
  * The Function for Mnemonic Item 
  * -----------------------------------------*/
-MnItem *ds_new_MnItem(AString, AAddr, ASize);
+MnItem *ds_new_MnItem(AString, AAddr, ASize, AType);
 
 /**
  * The Function for Register Item */

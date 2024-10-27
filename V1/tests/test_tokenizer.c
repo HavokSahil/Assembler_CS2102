@@ -34,7 +34,7 @@ int test_Jar() {
     AString strings[] = {"Hello", "World", "I", "am", "Assembler"};
     int i;
     for (i = 0; i<5; i++) {
-        Token* token = tk_new_Token(_TOK_TYPE_COMMENT, strings[i]);
+        Token* token = tk_new_Token(TYPE_TOK_COMMENT, strings[i]);
         if (token == NULL)
             return FAILURE;
         if (jar->put(jar, token) != SUCCESS)
@@ -86,7 +86,7 @@ int test_tokenizer_interface() {
             if (token == NULL)
                 return FAILURE;
 
-            if (token->cno != _TOK_COL_UNSET)
+            if (token->cno != UNSET_TOK_COL)
                 printf("%s (col:%d, type: %d), ", token->token, token->cno, token->type);
         }
         printf("\n\n");

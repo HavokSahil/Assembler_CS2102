@@ -75,7 +75,7 @@ add_library(parser_lib ${SRC_DIR}/parser/parser.c ${SRC_DIR}/tokenizer/tokenizer
 target_include_directories(parser_lib PUBLIC ${INCLUDE_DIR})
 add_library(decoder_lib ${SRC_DIR}/decoder/decoder.c ${SRC_DIR}/common_ds.c)
 target_include_directories(decoder_lib PUBLIC ${INCLUDE_DIR})
-add_library(logger_lib ${SRC_DIR}/logger/logger.c ${SRC_DIR}/common_ds.c)
+add_library(logger_lib ${SRC_DIR}/logger/logger.c ${SRC_DIR}/common_ds.c ${SRC_DIR}/parser/parser.c ${SRC_DIR}/tokenizer/tokenizer.c ${SRC_DIR}/decoder/decoder.c)
 target_include_directories(logger_lib PUBLIC ${INCLUDE_DIR})
 
 # Create the main executable
@@ -103,7 +103,7 @@ add_executable(test_ds ${TEST_DIR}/test_ds.c ${SRC_DIR}/common_ds.c)
 add_executable(test_tokenizer ${TEST_DIR}/test_tokenizer.c)
 
 # Link libraries to the test executables
-target_link_libraries(test_decoder PRIVATE decoder_lib)
+target_link_libraries(test_decoder PRIVATE decoder_lib parser_lib logger_lib)
 target_link_libraries(test_logger PRIVATE logger_lib)
 target_link_libraries(test_parser PRIVATE parser_lib)
 target_link_libraries(test_overlord PRIVATE decoder_lib logger_lib parser_lib)

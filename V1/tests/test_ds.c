@@ -1,5 +1,7 @@
 #include <common_ds.h>
-#include <err_codes.h>
+
+#define SUCCESS 0
+#define FAILURE 1
 
 int test_SymTable() {
     SymTable *table = ds_new_SymTable();
@@ -134,7 +136,7 @@ int test_MnMap() {
 
     int i;
     for (i = 0; i<4; i++) {
-        if (map->insert(map, mnemo[i], address[i], operator[i]) != SUCCESS)
+        if (map->insert(map, mnemo[i], address[i], operator[i], TYPE_MNE_OPERAND_NONE) != SUCCESS)
             return FAILURE;
     }
     for (i = 0; i<4; i++) {

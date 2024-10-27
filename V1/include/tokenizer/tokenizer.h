@@ -29,29 +29,6 @@
 #include <pthread.h>
 #include <string.h>
 
-
-/*----------------------------------------
- *	Types and definations for Tokenizer
- *----------------------------------------*/
-
-#define _TOK_CARGO_PKT_WIN 	1000	/* Packet Window Size for Loading the File Content into Cargo  */
-#define _TOK_LINE_BUFF_SZ		1024	/* Buffer Size for Line Reading   */
-#define _TOK_IF_MAX_THREAD	50		/* The maximum number of threads for Jarification  */
-#define _TOK_TOKEN_COMMENT_SIZE 	256
-#define _TOK_TOKEN_LABEL_SIZE 		32
-#define _TOK_TOKEN_MNEMONIC_SIZE 	32
-#define _TOK_TOKEN_OPERAND_SIZE 	32
-
-#define _TOK_TYPE_COMMENT 	0xF1	/* Token type Comment  */
-#define _TOK_TYPE_LABEL 		0xF2	/* Token type Label  */
-#define _TOK_TYPE_WORD	 		0xF3	/* Token type Mnemonic  */
-#define _TOK_TYPE_OPERATOR	0xF4	/* Token type Operator  */
-#define _TOK_TYPE_DIRECTIVE	0xF5	/* Token type Directive  */
-#define _TOK_TYPE_BLANK			0xF6	/* Token type Black  */
-
-#define _TOK_LINE_UNSET			0			/* Unset value of line number of token or packet */
-#define _TOK_COL_UNSET			0			/* Unset value of column number of token  */
-
 /*----------------------------------------
  *	Data structures for Tokenizer
  *----------------------------------------*/

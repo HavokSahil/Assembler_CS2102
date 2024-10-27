@@ -1,6 +1,5 @@
-#include <parser/parser.h>
 
 int test() {
-	return SUCCESS;
+	return 0;
 }
 
