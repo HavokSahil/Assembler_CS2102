@@ -74,5 +74,5 @@ typedef enum {
 /* Types and Size Definations for Decoder */
 #define DECODER_MODE_ALF	0x01
 #define DECODER_MODE_BIN	0x02
-#define DECODER_IBUF_SIZ	1024
+#define DECODER_IBUF_SIZ	64
 #endif

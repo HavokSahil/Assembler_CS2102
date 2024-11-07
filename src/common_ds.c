@@ -1334,7 +1334,7 @@ AErr ds_DList_insert(DList* dlist, AInt32 data, AAddr *return_addr) {
 
 	_ds_map* map = (_ds_map*)(dlist->map);
 
-	dlist->offset+=4;
+	dlist->offset+=1;
 	*return_addr = address;
 
 	return _ds_map_insert(map, address, (void*)ditem);

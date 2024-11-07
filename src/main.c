@@ -129,10 +129,6 @@ AErr execute_argument() {
         if (regmap->insert(regmap, registers[j].key, registers[j].encoding) != SUCCESS)
         return ERR_MAIN_EXECUTION;
     }
-
-	FILE* file_input = fopen(input_file, "r");
-	FILE* file_output = fopen(output_file, "w");
-	FILE* file_alf = fopen(alf_file, "w");
 	
 	LoggerInterface* li = lg_new_LoggerInterface(stdout, stdout, 0, elist, ilist, stable, dlist, map, regmap);
 	if (li == NULL)
@@ -143,6 +139,9 @@ AErr execute_argument() {
 		return SUCCESS;
 	}
 
+  FILE* file_input = fopen(input_file, "r");
+  FILE* file_output = fopen(output_file, "w");
+  FILE* file_alf = fopen(alf_file, "w");
 
 	if (parsed_args.input == 1 && file_input == NULL)
 		return ERR_MAIN_EXECUTION;

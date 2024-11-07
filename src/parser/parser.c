@@ -362,7 +362,12 @@ static AErr _psr_verify_set_directive(Jar* jar, SymTable* stable, EWList* elist)
 	AString label = _psr_alloc_astring(token->token, SZ_PSR_BUFF_OPRND);
 	if (label == NULL)
 		return ERR_MEM_ALLOC_FAIL;
-
+	
+	/* Case of Duplicate label  */
+	if (stable->find(stable, label) != ERR_MAP_FIND_ADDRESS) {
+		free(label);
+		return _psr_insert_error(elist, jar->lno, token->cno, PSR_ERR_DUP_LABEL);
+	}
 	cur+=2;	/* Jump the cursor to the value of set directive   */
 	token = jar->get(jar, cur);
 
@@ -378,10 +383,11 @@ static AErr _psr_verify_set_directive(Jar* jar, SymTable* stable, EWList* elist)
 	}
 
 	AInt operand_value = strtol(value, NULL, 0);
-	if (operand_value == 0) {
-			/* Operand format error   */
+
+	if ((strcmp(value, "0")!=0) && (operand_value == 0)) {
+	/* Invalid operand format: Parsing failed   */
 		free(label);
-		return _psr_insert_error(elist, jar->lno, token->cno, PSR_ERR_FMT_OPRND);
+		return _psr_insert_error(elist, jar->lno, token->cno, PSR_ERR_FMT_DDATA);
 	}
 
 	if (stable->insert(stable, label, operand_value) != SUCCESS) {
