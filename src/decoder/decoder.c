@@ -60,7 +60,7 @@ static AErr _dc_decode_instruction_handler(IItem* item, AAddr* addr, EWList* eli
             value = address;
             if (mitem->operand_type == TYPE_MNE_OPERAND_OFFSET) {
                 /* The operand is label to jump */
-                value =  value - (AInt32)(1+item->address);
+                value =  value - (AInt32)(item->address);
                 if (value == -1) {
                     /* Case of Infinite Loop */
                     if (mode == DECODER_MODE_BIN) {
@@ -180,7 +180,6 @@ AErr dc_decode(DecoderInterface* di, FILE* stream) {
     
     if (is_error(err)) {
         free(buffer);
-        printf("ERROR captured\n");
         return DEC_ERR_ERR_CAPTD;
     } else {
         if (di->dlist->size(di->dlist) != 0) {

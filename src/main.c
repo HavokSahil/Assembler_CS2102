@@ -161,14 +161,15 @@ AErr execute_argument() {
 	if (pi->parse(pi, file_input) != SUCCESS)
 		return ERR_MAIN_EXECUTION;
 	
-	if (di->decode(di, file_output) != SUCCESS)
-		return ERR_MAIN_EXECUTION;
-	
+	AErr err = di->decode(di, file_output);
 
 	li->log(li, 0);
 
 	if (parsed_args.alf == 1)
 		li->generate_alf(li, di, file_alf);
+
+  if (err != SUCCESS)
+      return ERR_MAIN_EXECUTION;
 
 	if (file_input)
 		fclose(file_input);

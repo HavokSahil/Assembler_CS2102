@@ -2,3 +2,6 @@ build/
 run
 temp/
 notes.txt
+subproject_assembler/
+TestAsm/
+assembler.zip
